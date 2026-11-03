@@ -13,7 +13,7 @@ A cozy, painterly, procedural garden builder for iPhone browsers (inspired by Ti
 
 ## Deploying
 - Work and commit on `master`, then deploy with `git push origin master && git push origin master:main`.
-- Only pushes to `main` deploy: the `github-pages` environment rejects `master`. Check the run under Actions, and confirm https://asrijanga.github.io/garden-game/ serves the new `assets/index-*.js`.
+- Only pushes to `main` deploy: the `github-pages` environment rejects `master`. Check the run under Actions, and confirm https://anirudh-janga.github.io/garden-game/ serves the new `assets/index-*.js`.
 
 ## Ground rules
 - **Emulate human, hand-done work.** Everything built in the garden should look made by hand, not by a machine:
