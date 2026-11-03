@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Cottage, DEFAULT_STYLE, decodeStyle, type CottageStyle } from '../world/cottage';
 import { SPECIES } from '../world/flowerSpecies';
 import { useSoftLight } from '../render/softLight';
-import { Bouquet, forBouquet } from '../world/bouquet';
 import { PALETTES, type Season } from '../world/season';
 import { Quality, TIERS, fpsCounter } from '../render/quality';
 import type { Ambience } from '../audio/ambience';
@@ -41,7 +40,7 @@ import { Stones } from '../world/stones';
 import { EdgePlants } from '../world/edgePlants';
 import { Dust } from '../world/dust';
 import { PathBuilder } from '../game/pathBuilder';
-import { buildShape, Flowers, setPlantSeason, type LeafKind } from '../world/flowers';
+import { Flowers, setPlantSeason } from '../world/flowers';
 import { Bees } from '../world/bees';
 import { Ponds, createPondTexture } from '../world/pond';
 import { PondPlants } from '../world/pondPlants';
@@ -714,8 +713,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   const weather = new Weather(!!palette.snowy);
   scene.add(weather.group);
   let dayTime = 0.55;
-  /** A bouquet is shown (in its own light: the garden's hour doesn't grade it). */
-  let bouquetShown = false;
   const weatherWind = new THREE.Vector2();
   const lastSun = new THREE.Vector3(Infinity, 0, 0);
   let sunMoved = false;
@@ -747,7 +744,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       scene.fog.near = fogNear * mist;
       scene.fog.far = fogFar * (0.6 + 0.4 * mist);
     }
-    if (!bouquetShown) post.setGrade(l.lift, l.gain, l.saturation, l.bloom);
+    post.setGrade(l.lift, l.gain, l.saturation, l.bloom);
     ponds.setLight(l.sunDir, l.sky, l.haze, l.glow, l.night);
     const dark = THREE.MathUtils.smoothstep(p, 0.68, 0.95);
     night.setNight(l.night, dark);
@@ -824,27 +821,10 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     surface.addEventListener('pointerup', (e) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || e.timeStamp - down.t > 450) return;
       ray.setFromCamera(new THREE.Vector2((e.clientX / screen.width) * 2 - 1, -(e.clientY / screen.height) * 2 + 1), camera);
-      if (rig.inBed) {
-        tryCut(e.clientX, e.clientY);
-        return;
-      }
       const onCottage = ray.intersectObject(cottage.group, true).length > 0;
-      // A tap on a flower bed (looking round the garden) goes close to it.
-      if (!onCottage && toolbar.tool === 'move' && !rig.inBed && !admiring) {
-        const at = bedPicker.pick(e.clientX, e.clientY);
-        const bed = at ? flowers.bedAround(at.x, at.z) : null;
-        if (bed && bed.plants.length) {
-          intro = null;
-          rig.enterBed(bed.centre, bed.radius, bed.bloomHeight);
-          showBed(bed);
-          link.call('bed', bed.plants.length);
-          return;
-        }
-      }
       link.call('cottageTap', onCottage);
     });
   }
-  const bedPicker = new GroundPicker(camera, surface, (x, z) => ground.heightAt(x, z));
   const setCottageStyle = (style: CottageStyle) => {
     cottage.setStyle(style);
     // Anything growing where the cottage now reaches (a shed, a porch) steps aside.
@@ -893,20 +873,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   }
   let actions: Action[] = [];
   if (debug) Object.assign(globalThis, { rebuildInstantly: () => rebuildInstantly(actions), cottageStyle: () => cottage.style });
-  // (For looking at plants close up from tests: go close to the bed at (x, z).)
-  if (debug) {
-    Object.assign(globalThis, {
-      enterBedAt: (x: number, z: number) => {
-        const bed = flowers.bedAround(x, z, 1);
-        if (!bed.plants.length) return 0;
-        rig.enterBed(bed.centre, bed.radius, bed.bloomHeight);
-        showBed(bed);
-        return bed.plants.length;
-      },
-      /** Where the nearest plant of the bed in view has its flowers on screen (for tapping it from tests). */
-      bedPlantOnScreen: () => (bedPlants.length ? headAt(bedPlants[0]) : null),
-    });
-  }
   /** Undone: rebuild without the last stroke, with a puff where it was. */
   const undo = (remaining: Action[], last: Action) => {
     actions = remaining;
@@ -1029,177 +995,13 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         g.userData = p.userData;
         return g;
       };
-      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near?: PackedShape; far?: PackedShape; stem?: PackedShape }>) => {
-        if (e.data.stem) stemArrived(e.data.key, unpack(e.data.stem));
-        else if (e.data.near && e.data.far) flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
+      shapes.addEventListener('message', (e: MessageEvent<{ key: string; near: PackedShape; far: PackedShape }>) => {
+        flowers.adopt(e.data.key, unpack(e.data.near), unpack(e.data.far));
       });
       shapes.postMessage({ season, recipes: Flowers.wanted(season) });
     } catch {
       // No workers from here: shapes are made when first planted.
     }
-  };
-
-  // --- Cutting: close to a bed, a tap on a plant cuts it for the bunch in your hand -------------
-  // The cut stem lifts away (up, out of the bed, shrinking as it goes) and the plant it came from
-  // grows again from the ground a little later, as a cut-and-come-again flower does.
-  const cutGroup = new THREE.Group();
-  scene.add(cutGroup);
-  /** The plants of the bed in view: what a tap can cut (set on going close, cleared on leaving). */
-  let bedPlants: { mesh: THREE.InstancedMesh; index: number; pos: THREE.Vector3; scale: number }[] = [];
-  const cuts: { mesh: THREE.InstancedMesh; from: THREE.Matrix4; t: number; spin: number }[] = [];
-  /** Plants cut and still growing back, by when (the flowers' clock) they can be cut again. */
-  const resting = new Map<string, number>();
-  const restKey = (mesh: THREE.InstancedMesh, index: number) => `${mesh.uuid}:${index}`;
-  let handFull = false;
-  const cutRay = new THREE.Raycaster();
-  const onScreen = new THREE.Vector3();
-  const stemKind = (species: string, sp: (typeof SPECIES)[number] | undefined) =>
-    species.startsWith('leaf:') ? 'foliage' : species.startsWith('rose') ? 'rose' : sp?.zone ? 'aquatic' : 'flower';
-  const seedOf = (v: THREE.Vector3) => Math.abs(Math.round(v.x * 1000) * 73856093 ^ Math.round(v.z * 1000) * 19349663) % 1000003;
-  /** Where a point is on screen (x, y in pixels, z < 1 when in front of the camera). */
-  const screenAt = (p: THREE.Vector3) => {
-    onScreen.copy(p).project(camera);
-    return { x: ((onScreen.x + 1) / 2) * screen.width, y: ((1 - onScreen.y) / 2) * screen.height, z: onScreen.z };
-  };
-  /** The head of a plant on screen: about where its flowers are. */
-  const headAt = (p: (typeof bedPlants)[number]) => screenAt(p.pos.clone().add(new THREE.Vector3(0, (Number(p.mesh.geometry.userData.headY) || 0.3) * p.scale, 0)));
-  const showBed = (bed: ReturnType<typeof flowers.bedAround>) => {
-    bedPlants = bed.plants.map((p) => ({ mesh: p.mesh, index: p.index, pos: p.pos, scale: p.scale }));
-  };
-  const clearBed = () => {
-    for (const c of cuts) {
-      cutGroup.remove(c.mesh);
-      c.mesh.geometry.dispose();
-    }
-    cuts.length = 0;
-    bedPlants = [];
-  };
-  const tryCut = (x: number, y: number): boolean => {
-    if (!bedPlants.length) return false;
-    cutRay.setFromCamera(new THREE.Vector2((x / screen.width) * 2 - 1, -(y / screen.height) * 2 + 1), camera);
-    const hit = cutRay.intersectObjects([...new Set(bedPlants.map((p) => p.mesh))], false)[0];
-    let pick = hit && hit.instanceId !== undefined ? { mesh: hit.object as THREE.InstancedMesh, index: hit.instanceId } : undefined;
-    // A fingertip is wide: missing every petal, the nearest flowerhead within reach still counts.
-    if (!pick) {
-      let best = 44;
-      for (const p of bedPlants) {
-        const h = headAt(p);
-        const d = Math.hypot(h.x - x, h.y - y);
-        if (h.z < 1 && d < best) {
-          best = d;
-          pick = { mesh: p.mesh, index: p.index };
-        }
-      }
-    }
-    if (!pick) return false;
-    // A plant still growing back from its last cut has nothing to take yet.
-    if ((resting.get(restKey(pick.mesh, pick.index)) ?? 0) > flowers.clock) return false;
-    if (handFull) {
-      link.call('label', 'Your hands are full: tie a bouquet first', 2000);
-      return true;
-    }
-    const info = flowers.plantInfo(pick.mesh, pick.index);
-    if (!info) return false;
-    const sp = SPECIES.find((s) => s.id === info.species);
-    const hex = (c: number[]) => `#${new THREE.Color(c[0], c[1], c[2]).getHexString()}`;
-    const at = new THREE.Vector3().setFromMatrixPosition(info.matrix);
-    const stem = {
-      species: info.species,
-      color: hex(info.petal),
-      edge: hex(info.edge),
-      kind: stemKind(info.species, sp),
-      inSeason: !sp || sp.seasons.includes(season),
-      variant: info.variant,
-      seed: seedOf(at),
-    };
-    // The stem lifts away as a copy of the plant itself, with its own colours and growth; the
-    // garden plant is set to grow back from the ground after a short rest.
-    const geo = pick.mesh.geometry.clone();
-    geo.setAttribute('aLife', new THREE.InstancedBufferAttribute(new Float32Array(info.life), 2));
-    geo.setAttribute('aPetalColor', new THREE.InstancedBufferAttribute(new Float32Array(info.petal), 3));
-    geo.setAttribute('aEdgeColor', new THREE.InstancedBufferAttribute(new Float32Array(info.edge), 3));
-    const stemMesh = new THREE.InstancedMesh(geo, pick.mesh.material, 1);
-    stemMesh.setMatrixAt(0, info.matrix);
-    stemMesh.frustumCulled = false;
-    cutGroup.add(stemMesh);
-    cuts.push({ mesh: stemMesh, from: info.matrix.clone(), t: 0, spin: (Math.random() - 0.5) * 2 });
-    const rest = 5 + Math.random() * 4;
-    flowers.regrowFrom(pick.mesh, pick.index, rest);
-    // (Back in leaf and bloom a few seconds after it starts to sprout.)
-    resting.set(restKey(pick.mesh, pick.index), flowers.clock + rest + 4);
-    ambience.snip();
-    dust.puff(at, 2, 0.25);
-    link.call('cut', stem);
-    return true;
-  };
-  const m4 = new THREE.Matrix4();
-  const lift = new THREE.Matrix4();
-  const updateCuts = (dt: number) => {
-    for (let i = cuts.length - 1; i >= 0; i--) {
-      const c = cuts[i];
-      c.t += dt / 0.7;
-      const k = Math.min(1, c.t);
-      const e = k * k * (3 - 2 * k);
-      // Up and out of the bed, turning a little in the hand, shrinking away towards the tray.
-      const s = 1 - e * 0.85;
-      lift.makeRotationY(c.spin * e).premultiply(new THREE.Matrix4().makeScale(s, s, s));
-      m4.copy(c.from).multiply(lift);
-      m4.elements[13] += e * 0.9;
-      c.mesh.setMatrixAt(0, m4);
-      c.mesh.instanceMatrix.needsUpdate = true;
-      if (k >= 1) {
-        cutGroup.remove(c.mesh);
-        c.mesh.geometry.dispose();
-        cuts.splice(i, 1);
-      }
-    }
-  };
-
-  // --- A bouquet: the stems in your hand, tied, on a turntable of its own -----------------------
-  // Each stem is grown again in full (in the shape worker) from what was cut; the garden isn't
-  // drawn meanwhile (the bouquet's own little scene is, through the same finishing passes).
-  const bouquet = new Bouquet();
-  let bouquetId = 0;
-  let bouquetStems: { color: string; edge?: string; seed: number }[] = [];
-  const stemArrived = (key: string, geo: THREE.BufferGeometry) => {
-    const [id, k] = key.slice(1).split(':').map(Number);
-    const s = bouquetStems[k];
-    if (id !== bouquetId || !s) {
-      geo.dispose();
-      return;
-    }
-    bouquet.add(k, geo, flowers.plantMaterial, new THREE.Color(s.color), new THREE.Color(s.edge ?? s.color), s.seed);
-    if (bouquet.ready) link.call('bouquetReady');
-  };
-  const tie = (stems: { species: string; variant: number; seed: number; color: string; edge?: string }[]) => {
-    bouquetId++;
-    bouquetStems = stems;
-    bouquet.begin(stems.length);
-    renderer.clippingPlanes = bouquet.clip;
-    post.view(bouquet.scene, bouquet.camera);
-    // Seen by soft daylight, whatever the hour in the garden.
-    bouquetShown = true;
-    // (No lift: the backdrop stays true black.)
-    post.setGrade(new THREE.Color('#000000'), new THREE.Color('#fffaf2'), 1.05, 0.12);
-    const asks = stems.map((s, k) => ({ key: `b${bouquetId}:${k}`, species: s.species, variant: s.variant }));
-    if (shapes) shapes.postMessage({ season, stems: asks });
-    else {
-      // No shape worker: grown here, a stem a frame.
-      asks.forEach((a, k) =>
-        setTimeout(() => {
-          const sp = a.species.startsWith('leaf:') ? (a.species.slice(5) as LeafKind) : SPECIES.find((x) => x.id === a.species);
-          if (sp) stemArrived(a.key, forBouquet(buildShape(a.species.startsWith('leaf:') ? { kind: 'leaf', leaf: sp as LeafKind, variant: a.variant } : { kind: 'flower', species: a.species, variant: a.variant }, SPECIES)[0]));
-        }, k * 16),
-      );
-    }
-  };
-  const untie = () => {
-    bouquetId++;
-    bouquet.end();
-    renderer.clippingPlanes = [];
-    post.view(scene, camera);
-    bouquetShown = false;
-    applyTime(dayTime);
   };
 
   // --- Loading: the saved garden is rebuilt while shaders compile -------------------------------
@@ -1257,7 +1059,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       props.update(dt);
       edgePlants.update(dt);
       flowers.update(dt);
-      if (cuts.length) updateCuts(dt);
       bees.update(dt);
       ponds.update(dt);
       fish.update(dt);
@@ -1320,12 +1121,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       rig.target.z += (-1.2 + Math.sin(admireTime * 0.033) * 2.5 - rig.target.z) * k;
     }
     rig.update(dt);
-    // Close to a bed the camera is right among the flowers: let it see things a hand's width away.
-    const near = THREE.MathUtils.lerp(0.5, 0.04, rig.closeness);
-    if (Math.abs(camera.near - near) > 1e-4) {
-      camera.near = near;
-      camera.updateProjectionMatrix();
-    }
     ambience.update(dt, wind.envelope, wind.sample(rig.target.x, rig.target.z));
     const buzz = bees.buzzNear(camera.position);
     const hum = hummingbirds.humNear(camera.position);
@@ -1352,7 +1147,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       if (shadows && c.casts) c.showAll();
       else c.update(view);
     }
-    bouquet.update(dt, screen.width / screen.height);
     post.render(dt);
   }
 
@@ -1374,11 +1168,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     tick: (time: number) => {
       if (!ownFrames) frame(time);
     },
-    pointer: (type: string, e: SurfaceEvent) => (bouquet.active ? bouquet.pointer(type, e.clientX, e.timeStamp) : surface.dispatch(type, e)),
-    /** Tie the stems in your hand into a bouquet, and show it. */
-    tie,
-    /** Back from the bouquet. */
-    untie,
+    pointer: (type: string, e: SurfaceEvent) => surface.dispatch(type, e),
     resize: (width: number, height: number, ratio: number) => {
       screen = { width, height, ratio };
       resize();
@@ -1420,15 +1210,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       admireTime = 0;
     },
     restorePaint: () => paint.restore(),
-    /** Back from a bed to the garden. */
-    leaveBed: () => {
-      rig.leaveBed();
-      clearBed();
-    },
-    /** The page's bunch is full (or has room again): taps stop cutting. */
-    handFull: (full: boolean) => {
-      handFull = full;
-    },
     shot,
     load,
     /** The page has shown its loading sprout long enough: the garden's clock starts. */

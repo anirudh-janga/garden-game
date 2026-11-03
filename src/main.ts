@@ -5,7 +5,6 @@ import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
 import { mountAdmire } from './ui/admire';
-import { mountBedView } from './ui/bedView';
 import { mountTimeDial } from './ui/timeDial';
 import { MIX_ID, SPECIES, WATER_MIX_ID, type FlowerSpecies } from './world/flowerSpecies';
 import { FlowerBook } from './ui/flowerBook';
@@ -22,11 +21,6 @@ import { keepStorage, makeBackup, readBackup } from './game/backup';
 import { confirmCard } from './ui/confirm';
 import { mountShotButton } from './ui/shotButton';
 import { mountUndoButtons } from './ui/undoButtons';
-import { mountBunch } from './ui/bunch';
-import { bouquetName, loadBunch, saveBunch, MAX_STEMS, type CutStem } from './game/bunch';
-import { mountBouquetView } from './ui/bouquetView';
-import { Collection } from './game/collection';
-import { mountCollection } from './ui/collectionBook';
 import type { PlantAmount } from './game/flowerBrush';
 import type { WeatherKind } from './world/weather';
 import { Link, proxied, type Port } from './engine/link';
@@ -279,7 +273,7 @@ const tidyPicker = new TidyPicker(
 keepStorage();
 /** A small file with the whole garden: to the share sheet (Save to Files) or a download. */
 function saveBackup() {
-  const file = makeBackup(store.actions, Number(stored(MEADOW_KEY)) || 0, keepMown, collection.toJSON());
+  const file = makeBackup(store.actions, Number(stored(MEADOW_KEY)) || 0, keepMown);
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
   if (nav.share && nav.canShare?.({ files: [file] })) {
     nav.share({ files: [file] }).catch(() => {});
@@ -317,7 +311,6 @@ pickBackup.addEventListener('change', async () => {
   store.replace(backup.actions);
   if (backup.meadow !== undefined) remember(MEADOW_KEY, String(backup.meadow));
   if (backup.keepMown !== undefined) remember(MOWN_KEY, backup.keepMown ? '1' : '0');
-  if (backup.bouquets) collection.restore(backup.bouquets);
   clearAddress();
   location.reload();
 });
@@ -401,111 +394,6 @@ dayTime = mountTimeDial(
   shared?.time ?? 0.55,
   shared?.time != null,
 );
-// Close to a bed: tapping one (looking round the garden) takes you there; back returns.
-const bedView = mountBedView(() => {
-  ambience.tap(0.95);
-  world.leaveBed();
-  bedView.show(false);
-});
-handlers.bed = ((count: number) => {
-  ambience.tap(1.15);
-  picker.setVisible(false);
-  cottagePanel.setVisible(false);
-  bedView.show(true);
-  toolbar.showLabel(count > 1 ? 'Tap a flower to cut it · drag to walk round · pinch to lean in' : 'Tap it to cut it · drag to walk round · pinch to lean in', 3000);
-}) as (...a: never[]) => unknown;
-// Cutting: close to a bed, a tap on a plant cuts it into the bunch in your hand.
-let bunch: CutStem[] = loadBunch();
-const emptyHand = () => {
-  bunch = [];
-  saveBunch(bunch);
-  bunchTray.set(bunch);
-  world.handFull(false);
-};
-// Tied: the bunch becomes a bouquet, shown on its own until it's untied or sold.
-const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? 'Leaf';
-const collection = Collection.load();
-const pointsHud = mountCollection(collection, speciesName);
-pointsHud.refresh();
-let bouquetTitle = '';
-/** The flower stems in the bouquet on show (what gets sold). */
-let tiedStems: CutStem[] = [];
-/** A small picture of the bouquet for the book (its middle, 3:4), as a JPEG. */
-const thumbnail = async (): Promise<string | undefined> => {
-  try {
-    const { blob } = await link.ask<{ blob: Blob; info: string }>('w.shot');
-    const img = await createImageBitmap(blob);
-    const c = document.createElement('canvas');
-    c.width = 180;
-    c.height = 240;
-    const w = Math.min(img.width, (img.height * 3) / 4);
-    const h = (w * 4) / 3;
-    c.getContext('2d')!.drawImage(img, (img.width - w) / 2, (img.height - h) * 0.4, w, h, 0, 0, 180, 240);
-    img.close();
-    return c.toDataURL('image/jpeg', 0.72);
-  } catch {
-    return undefined;
-  }
-};
-const bouquetView = mountBouquetView({
-  untie() {
-    ambience.rustle(0.5);
-    world.untie();
-    bouquetView.hide();
-  },
-  async done() {
-    const stems = tiedStems;
-    bouquetView.busy();
-    const thumb = collection.price(stems).isNew ? await thumbnail() : undefined;
-    const { value, isNew } = collection.sell(stems, bouquetTitle, thumb);
-    ambience.bloom();
-    world.untie();
-    bouquetView.hide();
-    emptyHand();
-    pointsHud.refresh(value);
-    toolbar.showLabel(isNew ? `Sold for ✿ ${value.format()} · new kind: prices ×1.15` : `Sold for ✿ ${value.format()}`, 2600);
-  },
-});
-handlers.bouquetReady = (() => bouquetView.ready()) as (...a: never[]) => unknown;
-const bunchTray = mountBunch(
-  () => {
-    // Only flowers are tied: cut greenery (leaves, ferns) stays in the hand, as it would in a
-    // florist's, since a leaf standing in for a stem reads as a big green plate.
-    const flowers = bunch.filter((s) => s.kind !== 'foliage');
-    if (flowers.length < 3) {
-      toolbar.showLabel('Three flowers make a bouquet (greenery stays in your hand)', 2400);
-      return;
-    }
-    ambience.rustle(0.8);
-    tiedStems = flowers;
-    const kinds = new Set(flowers.map((s) => s.species)).size;
-    bouquetTitle = bouquetName(flowers, speciesName);
-    const { value, isNew, repeat } = collection.price(flowers);
-    bouquetView.show(
-      bouquetTitle,
-      `${flowers.length} stems · ${kinds === 1 ? 'one kind' : `${kinds} kinds`} · tied by hand`,
-      `Worth ✿ ${value.format()}${repeat ? ` · sold ${repeat}× before` : ''}`,
-      isNew,
-      `Sell · ${value.format()}`,
-    );
-    world.tie(flowers);
-  },
-  () => {
-    ambience.rustle(0.6);
-    emptyHand();
-  },
-);
-bunchTray.set(bunch);
-world.handFull(bunch.length >= MAX_STEMS);
-let cutHints = 0;
-handlers.cut = ((stem: CutStem) => {
-  bunch.push(stem);
-  saveBunch(bunch);
-  bunchTray.set(bunch, true);
-  world.handFull(bunch.length >= MAX_STEMS);
-  if (bunch.length === 1 && cutHints++ < 2) toolbar.showLabel('Cut · it will grow back · tap more to gather a bunch', 2400);
-  else if (bunch.length >= MAX_STEMS) toolbar.showLabel('An armful: that’s all you can hold', 2200);
-}) as (...a: never[]) => unknown;
 // Admire mode: no buttons, just a slow drift round the garden.
 mountAdmire(
   () => {
