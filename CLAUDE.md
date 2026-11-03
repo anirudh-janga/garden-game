@@ -9,7 +9,7 @@ A cozy, painterly, procedural garden builder for iPhone browsers (inspired by Ti
 4. Before ending a session, update the Status section (current story, statuses, preview URL, notes), then commit and push.
 
 ## Commits
-- Commit as the repo owner: `git config user.name "Anirudh"` and `git config user.email "7342625+asrijanga@users.noreply.github.com"` (set it at the start of each session; the cloud container starts fresh). Keep the Claude co-author trailer.
+- Commit as the repo owner: `git config user.name "Anirudh"` and `git config user.email "7342625+anirudh-janga@users.noreply.github.com"` (set it at the start of each session; the cloud container starts fresh). Keep the Claude co-author trailer.
 
 ## Deploying
 - Work and commit on `master`, then deploy with `git push origin master && git push origin master:main`.
