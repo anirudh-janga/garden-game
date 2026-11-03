@@ -11,7 +11,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
 **Current stories:** The storybook / painting style is reverted at the player's request: the garden is back to its original rendering in soft cloudy-day light, with fewer insects (8.5, 👀 awaiting review). Milestone 7 and earlier 👀 stories still wait for review.
-**Preview URL:** https://asrijanga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
+**Preview URL:** https://anirudh-janga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
 |---|---|---|

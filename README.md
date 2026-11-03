@@ -2,7 +2,7 @@
 
 A cozy, painterly, procedural garden builder for iPhone browsers.
 
-**Play:** https://asrijanga.github.io/garden-game/
+**Play:** https://anirudh-janga.github.io/garden-game/
 
 See [BACKLOG.md](BACKLOG.md) for the plan and current status.
 
