@@ -1,9 +1,10 @@
 /// <reference lib="webworker" />
-import { buildShape, heroGeometry, setPlantSeason, shapeKey, type LeafKind, type ShapeRecipe } from '../world/flowers';
+import { buildShape, setPlantSeason, shapeKey, type ShapeRecipe } from '../world/flowers';
 import type { Season } from '../world/season';
 import { SPECIES } from '../world/flowerSpecies';
 import type * as THREE from 'three';
 import { forBouquet } from '../world/bouquet';
+import type { LeafKind } from '../world/flowers';
 
 /**
  * Builds plant shapes ahead of time, off the world's thread: a shape built the moment a species
@@ -25,43 +26,36 @@ const pack = (g: THREE.BufferGeometry, transfer: Transferable[]): PackedShape =>
   return { attributes, userData: g.userData };
 };
 
-/** A request for close-up plants: each its species, garden variant and own seed. */
-export interface HeroRequest {
+/** A cut stem to grow again for a bouquet: its species and garden variant. */
+export interface StemRequest {
   key: string;
   species: string;
   variant: number;
-  seed: number;
 }
 
-// Bouquet stems first (they're waited on), then close-ups (someone is looking at that bed),
-// one per task.
-let heroQueue: HeroRequest[] = [];
-let stemQueue: HeroRequest[] = [];
-const speciesOf = (id: string) => (id.startsWith('leaf:') ? (id.slice(5) as LeafKind) : SPECIES.find((s) => s.id === id));
+// Bouquet stems, one per task, as they're asked for.
+let stemQueue: StemRequest[] = [];
 let busy = false;
-const nextHero = () => {
+const nextStem = () => {
   busy = false;
-  const stem = stemQueue.shift();
-  const r = stem ?? heroQueue.shift();
+  const r = stemQueue.shift();
   if (!r) return;
   busy = true;
-  const sp = speciesOf(r.species);
-  if (sp) {
-    const transfer: Transferable[] = [];
-    const g = heroGeometry(sp, r.variant, r.seed);
-    if (stem) self.postMessage({ key: r.key, stem: pack(forBouquet(g), transfer) }, transfer);
-    else self.postMessage({ key: r.key, hero: pack(g, transfer) }, transfer);
-  }
-  setTimeout(nextHero, 0);
+  const recipe: ShapeRecipe = r.species.startsWith('leaf:')
+    ? { kind: 'leaf', leaf: r.species.slice(5) as LeafKind, variant: r.variant }
+    : { kind: 'flower', species: r.species, variant: r.variant };
+  const transfer: Transferable[] = [];
+  const [near] = buildShape(recipe, SPECIES);
+  self.postMessage({ key: r.key, stem: pack(forBouquet(near), transfer) }, transfer);
+  setTimeout(nextStem, 0);
 };
 
-self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes?: ShapeRecipe[]; hero?: HeroRequest[]; stems?: HeroRequest[] }>) => {
+self.addEventListener('message', (e: MessageEvent<{ season: Season; recipes?: ShapeRecipe[]; stems?: StemRequest[] }>) => {
   setPlantSeason(e.data.season);
-  if (e.data.hero || e.data.stems) {
-    // A new bed (or bouquet): what was asked for the last one is no longer needed.
-    if (e.data.hero) heroQueue = [...e.data.hero];
-    if (e.data.stems) stemQueue = [...e.data.stems];
-    if (!busy) nextHero();
+  if (e.data.stems) {
+    // A new bouquet: what was asked for the last one is no longer needed.
+    stemQueue = [...e.data.stems];
+    if (!busy) nextStem();
     return;
   }
   const queue = [...(e.data.recipes ?? [])];

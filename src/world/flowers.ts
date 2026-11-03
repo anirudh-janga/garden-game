@@ -4,8 +4,6 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import { SPECIES, type FlowerSpecies } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
-import { blob, disc, floret, lathe, leaf, petalBlade, stamens, surface, tube, type HeroHints } from './heroParts';
-import type { RadialForm } from './flowerSpecies';
 import type { Season } from './season';
 
 const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
@@ -26,44 +24,16 @@ export const BLOOM_END = 2.8;
  * While set, plants are built with less detail (fewer petal rows, thinner stems) for when
  * they're seen from far off. The shapes come out the same: the same seed makes the same plant.
  */
-let detail: 'far' | 'near' | 'hero' = 'near';
-/** The close-up details of the species being built (when `detail` is 'hero'). */
-let hints: HeroHints = {};
+let detail: 'far' | 'near' = 'near';
 /** (Kept for the simplified far-off shapes.) */
 const isFar = () => detail === 'far';
 /**
  * The plant being built has crowded heads (roses, many-rayed daisies): seen from the garden its
  * petals are too small to show their shaping, so they take the light six-triangle shape (a bed
- * of patio roses was over a million triangles otherwise). Close up, the hero shapes have it all.
+ * of patio roses was over a million triangles otherwise).
  */
 let denseHeads = false;
-const lightPetals = () => isFar() || (denseHeads && detail !== 'hero');
-
-/**
- * One plant's close-up ("hero") shape: its species and garden variant (so it's recognisably the
- * same plant), finished in fine detail, with imperfections of its own from `plantSeed`.
- */
-export function heroGeometry(sp: FlowerSpecies | LeafKind, variant: number, plantSeed: number): THREE.BufferGeometry {
-  if (typeof sp === 'string') {
-    // A bed's foliage (its leaf kind and variant).
-    detail = 'hero';
-    try {
-      return leafGeometry(sp, 2000 + LEAF_KINDS.indexOf(sp) * 101 + variant * 17);
-    } finally {
-      detail = 'near';
-    }
-  }
-  const si = SPECIES.findIndex((s) => s.id === sp.id);
-  detail = 'hero';
-  hints = sp.hero ?? {};
-  try {
-    const geo = sp.form.kind === 'foliage' ? leafGeometry(sp.form.leaf, 1000 + si * 97 + variant * 13) : flowerGeometry(sp, 1000 + si * 97 + variant * 13, plantSeed);
-    return geo;
-  } finally {
-    detail = 'near';
-    hints = {};
-  }
-}
+const lightPetals = () => isFar() || denseHeads;
 
 /** Builds a plant's geometry twice: in full, and simplified for when it's far away. */
 function withFar(build: () => THREE.BufferGeometry): [THREE.BufferGeometry, THREE.BufferGeometry] {
@@ -98,7 +68,6 @@ const LEAF = new THREE.Color('#5f9a42');
 const WHITE = new THREE.Color('#ffffff');
 
 function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => number, withLeaves = true) {
-  if (detail === 'hero') return heroStem(m, height, lean, rng, withLeaves);
   const segs = isFar() ? 2 : 4;
   const sides = isFar() ? 3 : 4;
   const r0 = 0.0055;
@@ -227,10 +196,6 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
     // (A rose's petals are deep at the base, inside the cup, and light at their rolled rims.)
     return (style.round ? lerp(0.68, 1.02, Math.pow(t, 0.8)) : lerp(0.74, 0.98, Math.pow(t, 0.7))) * (1 - edge * 0.06) * face;
   };
-  if (detail === 'hero') {
-    heroPetal(m, at, rows, centreT, width, crease, edgeAt, shadeAt, { color: WHITE, petal: true, hinge, axis, close: Math.max(0, open - closeTo) }, rng);
-    return;
-  }
   if (lightPetals()) {
     // Seen from afar (or a crowded head): the same outline in four rows and no crease (6
     // triangles, not 24), a touch wider so the bloom covers the same area.
@@ -269,172 +234,6 @@ function petal(m: FlowerMesh, hinge: THREE.Vector3, az: number, open: number, le
   }
 }
 
-/**
- * A flower hanging from an arching stem, up close: bleeding heart's puffy two-lobed locket with
- * its white drop; Solomon's seal's slim green-tipped bell; fuchsia's four reflexed sepals over a
- * petticoat of petals, stamens hanging below.
- */
-function heroHanging(m: FlowerMesh, shape: 'heart' | 'bell', hang: THREE.Vector3, size: number, az: number, stalk: THREE.Vector3, rng: () => number) {
-  const look = { petal: true, hinge: stalk };
-  const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
-  const down = new THREE.Vector3(0, -1, 0);
-  if (shape === 'heart') {
-    for (const sgn of [-1, 1]) blob(m, hang.clone().addScaledVector(d, sgn * size * 0.38).add(new THREE.Vector3(0, -size * 0.55, 0)), new THREE.Vector3(size * 0.45, size * 0.62, size * 0.34), WHITE, look, 8);
-    const tip = hang.clone().add(new THREE.Vector3(0, -size * 1.1, 0));
-    lathe(m, tip, down, [[size * 0.18, 0], [size * 0.22, size * 0.35], [size * 0.12, size * 0.75], [0.0005, size * 0.95]], 7, () => new THREE.Color('#fbf6f8'), {});
-    return;
-  }
-  if (hints.floret === 'funnel') {
-    // Fuchsia.
-    const neck = hang.clone().add(new THREE.Vector3(0, -size * 0.6, 0));
-    lathe(m, hang, down, [[size * 0.12, 0], [size * 0.16, size * 0.6]], 6, () => WHITE.clone().multiplyScalar(0.9), look);
-    for (let i = 0; i < 4; i++) {
-      const a = az + (i / 4) * Math.PI * 2;
-      const out = new THREE.Vector3(Math.cos(a), 0.15, Math.sin(a)).normalize();
-      petalBlade(m, neck, out, size * 1.1, size * 0.4, 0.2, look, rng);
-    }
-    lathe(m, neck, down, [[size * 0.25, 0], [size * 0.45, size * 0.5], [size * 0.55, size * 0.9]], 10, () => new THREE.Color('#ffffff').multiplyScalar(0.85), { petal: true, hinge: hang }, (k, a) => 1 + (k > 0.7 ? 0.1 * Math.sin(a * 4) : 0));
-    // Stamens (and the longer style) hanging out below.
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2;
-      const from = neck.clone().add(new THREE.Vector3(Math.cos(a) * size * 0.08, -size * 0.6, Math.sin(a) * size * 0.08));
-      const to = from.clone().add(new THREE.Vector3(Math.cos(a) * size * 0.12, -size * (i === 0 ? 1.4 : lerp(0.7, 1.0, rng())), Math.sin(a) * size * 0.12));
-      tube(m, [from, to], size * 0.025, size * 0.02, new THREE.Color('#e8b0c8'), 3);
-      blob(m, to, new THREE.Vector3(size * 0.06, size * 0.08, size * 0.06), new THREE.Color(i === 0 ? '#f6f0e8' : '#c84a7a'), {}, 4);
-    }
-    return;
-  }
-  // Solomon's seal: a slim tube, green at the tip.
-  lathe(m, hang, down, [[size * 0.14, 0], [size * 0.3, size * 0.4], [size * 0.32, size * 1.2], [size * 0.42, size * 1.5]], 8, (k) => (k > 0.85 ? new THREE.Color('#9ab870') : new THREE.Color('#fbfbf2')), {});
-}
-
-/**
- * The middle of a daisy-like flower up close: disc florets (or a cone, or a boss of stamens),
- * and stamens round it where the species has them.
- */
-function heroCentre(m: FlowerMesh, top: THREE.Vector3, f: RadialForm, rng: () => number) {
-  const kind = hints.disc ?? (f.cone ? 'cone' : f.domed ? null : 'florets');
-  const base = new THREE.Color(f.center);
-  if (kind === 'eye') {
-    // Pansy and poppy: a small dark eye.
-    blob(m, top.clone().add(new THREE.Vector3(0, f.centerSize * 0.2, 0)), new THREE.Vector3(f.centerSize, f.centerSize * 0.5, f.centerSize), base, {}, 8);
-  } else if (kind === 'boss') {
-    blob(m, top.clone().add(new THREE.Vector3(0, f.centerSize * 0.25, 0)), new THREE.Vector3(f.centerSize * 0.8, f.centerSize * 0.7, f.centerSize * 0.8), base, {}, 8);
-  } else if (kind) {
-    const colors = hints.discColors ?? [base.getHexString(), base.clone().multiplyScalar(0.6).getHexString()].map((c) => `#${c}`) as [string, string];
-    disc(m, top, f.centerSize, kind, colors, f.cone ?? f.centerSize * 0.45, rng);
-  }
-  const st = hints.stamens ?? (f.stamens ? { color: f.stamens, count: 26, length: 0.35 } : null);
-  if (st) stamens(m, top.clone().add(new THREE.Vector3(0, f.centerSize * 0.2, 0)), f.centerSize * 1.4, st.count, f.length * st.length, new THREE.Color(st.color), new THREE.Color('#e8e0c0'), rng);
-}
-
-/**
- * A stem up close: smooth and tapering, bending gently; its leaves true to the species (shape,
- * how many, alternate or in pairs, a rosette at the foot), each one a little different.
- */
-function heroStem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => number, withLeaves: boolean): THREE.Vector3 {
-  const green = new THREE.Color(hints.green ?? '#4f8a3a');
-  const pts: THREE.Vector3[] = [];
-  const wob = rng() * 6.28;
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12;
-    pts.push(new THREE.Vector3(lean.x * t * t + Math.sin(t * 3 + wob) * 0.004, height * t, lean.z * t * t + Math.cos(t * 2.6 + wob) * 0.004));
-  }
-  tube(m, pts, hints.hairy ? 0.0065 : 0.0055, 0.0032, green.clone().multiplyScalar(0.95), 7);
-  if (!withLeaves) return pts[12];
-  const shape = hints.leaf ?? 'lance';
-  const at = (t: number) => {
-    const x = t * 12;
-    const i = Math.min(11, Math.floor(x));
-    return pts[i].clone().lerp(pts[i + 1], x - i);
-  };
-  const leafy = green.clone().multiplyScalar(1.05);
-  // A rosette at the foot (short plants, bulbs, and those that make one).
-  if (hints.basal || height < 0.26) {
-    const n = shape === 'strap' ? 4 + Math.floor(rng() * 3) : 5 + Math.floor(rng() * 3);
-    for (let i = 0; i < n; i++) {
-      const az = (i / n) * Math.PI * 2 + rng() * 0.5;
-      const tilt = shape === 'strap' ? lerp(0.9, 1.25, rng()) : lerp(0.25, 0.5, rng());
-      const dir = new THREE.Vector3(Math.cos(az) * Math.cos(tilt), Math.sin(tilt), Math.sin(az) * Math.cos(tilt));
-      const len = shape === 'strap' ? height * lerp(0.45, 0.7, rng()) : lerp(0.09, 0.13, rng());
-      leaf(m, new THREE.Vector3(0, 0.01, 0), dir, len, shape, leafy, rng);
-    }
-  }
-  const count = hints.leaves ?? (height < 0.26 ? 0 : 3);
-  for (let i = 0; i < count; i++) {
-    const t = lerp(0.12, 0.62, (i + rng() * 0.5) / Math.max(1, count));
-    const base = at(t);
-    const pair = hints.opposite ? [0, Math.PI] : [0];
-    const az0 = i * (hints.opposite ? Math.PI / 2 : 2.4) + rng() * 0.4;
-    for (const da of pair) {
-      const az = az0 + da;
-      const tilt = lerp(0.35, 0.75, rng());
-      const dir = new THREE.Vector3(Math.cos(az) * Math.cos(tilt), Math.sin(tilt), Math.sin(az) * Math.cos(tilt));
-      const len = (shape === 'strap' ? 0.2 : shape === 'palmate' ? 0.08 : lerp(0.09, 0.14, rng())) * (1 - t * 0.4);
-      leaf(m, base, dir, len, shape, leafy, rng);
-    }
-  }
-  return pts[12];
-}
-
-/**
- * A petal up close: the same outline, but a fine smooth surface: its edge waving or crinkling
- * (per species), veins running out from the base, deeper colour at the heart, a paler rim; and
- * now and then a torn tip, a brown spot or a nibbled edge.
- */
-function heroPetal(
-  m: FlowerMesh,
-  at: (t: number, w: number) => THREE.Vector3,
-  rows: [number, number][],
-  centreT: (t: number) => number,
-  width: number,
-  crease: THREE.Vector3,
-  edgeAt: (t: number) => number,
-  shadeAt: (t: number, edge: number) => number,
-  look: { color: THREE.Color; petal: boolean; hinge: THREE.Vector3; axis: THREE.Vector3; close: number },
-  rng: () => number,
-) {
-  // Half-width along the petal, smoothly between the outline's rows.
-  const half = (t: number) => {
-    for (let i = 0; i < rows.length - 1; i++) {
-      if (t <= rows[i + 1][0]) {
-        const k = (t - rows[i][0]) / Math.max(1e-6, rows[i + 1][0] - rows[i][0]);
-        return lerp(rows[i][1], rows[i + 1][1], k * k * (3 - 2 * k));
-      }
-    }
-    return rows[rows.length - 1][1];
-  };
-  const ruffle = hints.ruffle ?? 0.15;
-  const veins = hints.veins ?? 7;
-  const phase = rng() * 6.28;
-  const freq = lerp(3, 6, rng()) + ruffle * 6;
-  const tear = rng() < 0.07 ? { t: lerp(0.7, 0.92, rng()), side: rng() < 0.5 ? -1 : 1 } : null;
-  const spot = rng() < 0.05 ? { t: lerp(0.3, 0.8, rng()), u: lerp(-0.6, 0.6, rng()) } : null;
-  const nibble = rng() < 0.06 ? { t: lerp(0.4, 0.85, rng()), side: rng() < 0.5 ? -1 : 1 } : null;
-  const pos = (t: number, u: number) => {
-    const p = at(t < 0.97 ? t : centreT(t), u * half(t));
-    // The edge waves (more toward the tip and the rim).
-    const wave = Math.sin(t * freq * Math.PI + phase + u * 1.7) * Math.pow(Math.abs(u), 1.6) * Math.pow(t, 0.8);
-    return p.addScaledVector(crease, wave * width * (0.05 + 0.22 * ruffle));
-  };
-  surface(
-    m,
-    12,
-    8,
-    pos,
-    look,
-    (t, u) => {
-      const e = Math.abs(u);
-      // Veins: fine darker lines fanning out from the base, fading toward the tip.
-      const vein = 1 - 0.07 * (1 - t * 0.6) * Math.pow(Math.abs(Math.cos(u * veins * Math.PI * 0.5)), 8);
-      let k = shadeAt(t, e) * vein * (1 + 0.05 * e * t);
-      if (spot && Math.hypot(t - spot.t, (u - spot.u) * 0.5) < 0.06) k *= 0.62;
-      return k;
-    },
-    (t) => edgeAt(t),
-    (t, u) => (tear ? t > tear.t && u * tear.side > (tear.t + 0.12 - t) * 6 - 0.4 : false) || (nibble ? Math.abs(t - nibble.t) < 0.05 && u * nibble.side > 0.7 : false),
-  );
-}
 
 /** Small green sepals cupping the underside of a bloom. */
 function sepals(m: FlowerMesh, top: THREE.Vector3, size: number, rng: () => number) {
@@ -616,7 +415,7 @@ function boxGeometry(seed: number): THREE.BufferGeometry {
   const rng = createRng(seed);
   const m = new FlowerMesh();
   const base = new THREE.Vector3();
-  const ico = new THREE.IcosahedronGeometry(0.17, isFar() ? 1 : detail === 'hero' ? 4 : 3); // (already non-indexed)
+  const ico = new THREE.IcosahedronGeometry(0.17, isFar() ? 1 : 3); // (already non-indexed)
   const pos = ico.attributes.position;
   // Soft lumps where the shears missed a bit, and a fine leafy roughness (the same at shared
   // corners, so the surface stays whole).
@@ -846,7 +645,7 @@ function roseBloom(m: FlowerMesh, top: THREE.Vector3, size: number, petals: numb
 function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climber' | 'wild' | 'mini', height: number, size: number, rng: () => number): THREE.Vector3 {
   const full = type === 'cabbage' ? 42 : type === 'tea' ? 26 : type === 'mini' ? 16 : type === 'floribunda' ? 20 : 22;
   // (From the garden the inner petals of a rose can't be told apart: fewer of them there.)
-  const petals = detail === 'hero' ? full : Math.round(full * 0.6);
+  const petals = Math.round(full * 0.6);
   const canes = type === 'tea' ? 2 : type === 'cabbage' ? 3 : type === 'floribunda' ? 3 : type === 'climber' ? 3 : type === 'wild' ? 4 : 3;
   let top = new THREE.Vector3(0, 0, 0);
   for (let c = 0; c < canes; c++) {
@@ -1210,10 +1009,6 @@ function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shap
       const size = f.floretSize * HEAD * lerp(1.1, 0.65, k / f.florets) * lerp(0.9, 1.1, rng());
       const hang = p.clone().add(new THREE.Vector3(0, -size * 1.5, 0));
       strip(m, p, hang, 0.0015);
-      if (detail === 'hero') {
-        heroHanging(m, f.shape, hang, size, az, p, rng);
-        continue;
-      }
       if (f.shape === 'heart') {
         const heart = new THREE.OctahedronGeometry(size, 1);
         heart.scale(1.15, 0.95, 0.6);
@@ -1269,13 +1064,6 @@ function cloudHead(m: FlowerMesh, top: THREE.Vector3, f: { florets: number; spre
     const r = f.spread * 0.45 * Math.cbrt(rng());
     const a = rng() * Math.PI * 2;
     const y = (rng() - 0.3) * f.spread * 0.4;
-    if (detail === 'hero') {
-      // Each speck a tiny flower on a hair-fine stalk from its branch.
-      const at = new THREE.Vector3(c.x + Math.cos(a) * r, c.y + y, c.z + Math.sin(a) * r);
-      tube(m, [c, at], 0.0008, 0.0005, STEM, 3);
-      floret(m, hints.floret ?? 'star', at, at.clone().sub(c).normalize().addScaledVector(UP, 1).normalize(), f.floretSize * HEAD * 1.1 * lerp(0.7, 1.3, rng()), hints.floretPetals ?? 5, rng);
-      continue;
-    }
     const g = new THREE.OctahedronGeometry(f.floretSize * HEAD * 0.6 * lerp(0.7, 1.3, rng()), 0);
     g.translate(c.x + Math.cos(a) * r, c.y + y, c.z + Math.sin(a) * r);
     m.addGeometry(g, WHITE, true, top);
@@ -1289,27 +1077,7 @@ function cloudHead(m: FlowerMesh, top: THREE.Vector3, f: { florets: number; spre
 function pincushionHead(m: FlowerMesh, top: THREE.Vector3, f: { size: number; spiky: boolean }, rng: () => number): THREE.BufferGeometry {
   const size = f.size * HEAD * 0.6;
   const centre = top.clone().add(new THREE.Vector3(0, size * (f.spiky ? 1 : 0.3), 0));
-  if (f.spiky && detail === 'hero') {
-    // Globe thistle up close: a ball of fine, stiff, steel-blue spines (the florets to come).
-    blob(m, centre, new THREE.Vector3(size * 0.62, size * 0.62, size * 0.62), WHITE, { petal: true, hinge: top }, 10);
-    for (let i = 0; i < 140; i++) {
-      const t = (i + 0.5) / 140;
-      const phi = Math.acos(1 - 2 * t);
-      const th = i * 2.39996;
-      const dir = new THREE.Vector3(Math.sin(phi) * Math.cos(th), Math.cos(phi), Math.sin(phi) * Math.sin(th));
-      const from = centre.clone().addScaledVector(dir, size * 0.55);
-      tube(m, [from, from.clone().addScaledVector(dir, size * lerp(0.35, 0.5, rng()))], size * 0.05, size * 0.006, WHITE.clone().multiplyScalar(0.9), 3);
-    }
-  } else if (!f.spiky && detail === 'hero') {
-    // Scabious up close: frilly outer florets round a cushion of tiny florets, with pale pins.
-    for (let i = 0; i < 16; i++) {
-      const az = (i / 16) * Math.PI * 2 + (rng() - 0.5) * 0.2;
-      const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * size * 0.8, 0, Math.sin(az) * size * 0.8));
-      petal(m, hinge, az, 1.35 + (rng() - 0.5) * 0.2, size * 1.1, size * 0.9, 0, 0.12, rng, { notch: true });
-    }
-    disc(m, top.clone().add(new THREE.Vector3(0, size * 0.1, 0)), size * 0.8, 'florets', ['#c8b8e0', '#8a7aa8'], size * 0.45, rng);
-    stamens(m, top.clone().add(new THREE.Vector3(0, size * 0.3, 0)), size * 0.6, 30, size * 0.45, new THREE.Color('#fbf6ff'), new THREE.Color('#e8e0f0'), rng);
-  } else if (f.spiky) {
+  if (f.spiky) {
     const ball = new THREE.IcosahedronGeometry(size * 0.7, 1);
     ball.translate(centre.x, centre.y, centre.z);
     m.addGeometry(ball, WHITE, true, top);
@@ -1371,12 +1139,6 @@ function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radiu
       const az = (i / per) * Math.PI * 2 + (k % 2) * (Math.PI / per) + (rng() - 0.5) * 0.2;
       const out = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
       const dir = out.clone().multiplyScalar(0.45).add(new THREE.Vector3(0, -0.9, 0)).normalize();
-      if (detail === 'hero') {
-        // A curved tube flaring a little at its mouth.
-        const base = new THREE.Vector3(top.x + out.x * r, y, top.z + out.z * r);
-        lathe(m, base, dir, [[0.0035, 0], [0.0042, 0.02], [0.005, 0.034], [0.0062, 0.04]], 6, (k) => WHITE.clone().multiplyScalar(0.8 + 0.2 * k), { petal: true, hinge: top });
-        continue;
-      }
       const tube = new THREE.CylinderGeometry(0.0035, 0.005, 0.04, 4, 1);
       tube.translate(0, -0.02, 0);
       tube.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir));
@@ -1449,30 +1211,8 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const az = rng() * Math.PI * 2;
       m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(az), 0, Math.sin(az)), f.tilt * lerp(0.85, 1.1, rng())));
     }
-    if (detail === 'hero' && hints.iris) {
-      // Iris: three broad falls arching out and down, each with a golden beard; three
-      // standards between them, upright and cupped inwards; a narrow style arm over each fall.
-      const off = rng() * Math.PI * 2;
-      for (let i = 0; i < 3; i++) {
-        const az = off + (i / 3) * Math.PI * 2 + (rng() - 0.5) * 0.12;
-        const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
-        const hinge = top.clone().addScaledVector(d, f.centerSize * 0.6);
-        petal(m, hinge, az, 2.25 + (rng() - 0.5) * 0.15, f.length * 1.2 * lerp(0.92, 1.08, rng()), f.width * 1.35, -0.12, 0.2, rng, { blotch: f.blotch });
-        for (let b = 0; b < 7; b++) {
-          const t = 0.08 + b * 0.045;
-          const p = hinge.clone().addScaledVector(d, f.length * t * 1.1).add(new THREE.Vector3(0, f.length * (0.04 - t * t * 0.9), 0));
-          blob(m, p, new THREE.Vector3(f.width * 0.09, f.width * 0.07, f.width * 0.12), new THREE.Color('#f2b630'), {}, 4);
-        }
-        petal(m, hinge.clone().add(new THREE.Vector3(0, f.length * 0.05, 0)), az, 1.15, f.length * 0.55, f.width * 0.42, 0.25, 0.1, rng);
-        const sd = az + Math.PI / 3;
-        petal(m, top.clone().add(new THREE.Vector3(Math.cos(sd), 0, Math.sin(sd)).multiplyScalar(f.centerSize * 0.4)), sd, 0.38 + (rng() - 0.5) * 0.1, f.length * 1.05, f.width * 1.15, 0.35, 0.15, rng);
-      }
-      const geo = m.build();
-      geo.userData.headY = top.y;
-      return geo;
-    }
     // (Crowded heads carry fewer petals in the garden, where the inner ones are hidden anyway.)
-    const n = Math.round(lerp(f.petals[0], f.petals[1], rng()) * (denseHeads && detail !== 'hero' ? 0.7 : 1));
+    const n = Math.round(lerp(f.petals[0], f.petals[1], rng()) * (denseHeads ? 0.7 : 1));
     const layers = Math.max(1, f.layers + (f.layers > 1 ? Math.round((rng() - 0.5) * 2) : 0));
     const style = { notch: f.notch, pointed: f.pointed, blotch: f.blotch };
     for (let layer = 0; layer < layers; layer++) {
@@ -1494,8 +1234,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         petal(m, hinge, az, open + (rng() - 0.5) * 0.12, len, f.width * lerp(0.88, 1.12, rng()) * (f.domed ? lerp(1, 0.75, k) : 1), cup, 0.12, rng, style);
       }
     }
-    if (detail === 'hero') heroCentre(m, top, f, rng);
-    else if (f.cone) {
+    if (f.cone) {
       // Black-eyed Susan: a dark, raised cone.
       const cone = new THREE.ConeGeometry(f.centerSize, f.cone, 10, 2);
       cone.translate(top.x, top.y + f.cone * 0.5, top.z);
@@ -1506,21 +1245,14 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       centre.translate(top.x, top.y + f.centerSize * 0.25, top.z);
       m.addGeometry(centre, new THREE.Color(f.center), false, top);
     }
-    if (f.corona && detail === 'hero') {
-      // Daffodil up close: a trumpet flaring to a frilled, crinkled rim.
-      const len = f.length * f.corona.length;
-      const c = new THREE.Color(f.corona.color);
-      lathe(m, top, UP, [[f.centerSize * 1.0, 0], [f.centerSize * 1.25, len * 0.4], [f.centerSize * 1.5, len * 0.85], [f.centerSize * 2.1, len]], 18, (k) => c.clone().multiplyScalar(0.8 + 0.25 * k), {}, (k, a) => 1 + (k > 0.8 ? 0.1 * Math.sin(a * 9) : 0));
-    } else if (f.corona) {
+    if (f.corona) {
       // Daffodil: a frilled trumpet standing up out of the middle.
       const len = f.length * f.corona.length;
       const cup = new THREE.CylinderGeometry(f.centerSize * 1.9, f.centerSize * 1.1, len, 12, 1, true);
       cup.translate(top.x, top.y + len * 0.5, top.z);
       m.addGeometry(cup, new THREE.Color(f.corona.color), false, top);
     }
-    if (detail === 'hero') {
-      // (Stamens up close are part of the centre.)
-    } else if (f.stamens) {
+    if (f.stamens) {
       // Anemone: a ring of golden stamens round the green centre.
       const c = new THREE.Color(f.stamens);
       for (let i = 0; i < 16; i++) {
@@ -1551,12 +1283,6 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         const y = top.y + (1 - (r / f.radius) ** 2) * f.radius * rise + (shape === 'dome' ? f.floretSize * rng() : 0);
         attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
       }
-      if (detail === 'hero') {
-        // Each floret a little flower of its own, facing out from the head.
-        const out = attach.clone().sub(top).normalize().addScaledVector(UP, 0.6).normalize();
-        floret(m, hints.floret ?? 'star', attach, out, f.floretSize * 2 * lerp(0.85, 1.15, rng()), hints.floretPetals ?? 5, rng);
-        continue;
-      }
       const g = new THREE.OctahedronGeometry(f.floretSize * lerp(0.8, 1.2, rng()), 0);
       g.scale(1, 0.5, 1);
       g.translate(attach.x, attach.y, attach.z);
@@ -1577,8 +1303,6 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       petal(m, hinge, az, f.open * (inner ? 0.8 : 1), f.length * (inner ? 0.95 : 1), f.width, 0.22, 0.04, rng);
     }
     sepals(m, top, f.length * 0.25, rng);
-    // Up close, the stamens and pistil standing in the cup.
-    if (detail === 'hero' && hints.stamens) stamens(m, top, f.width * 0.15, hints.stamens.count, f.length * hints.stamens.length, new THREE.Color(hints.stamens.color), new THREE.Color('#e8e0c0'), rng);
   } else {
     // Spike: florets spiral up the top of the stem, smaller toward the tip.
     for (let i = 0; i < f.florets; i++) {
@@ -1588,18 +1312,6 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const size = f.floretSize * lerp(1.1, 0.55, t);
       const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
       const attach = new THREE.Vector3(top.x * (y / top.y), y, top.z * (y / top.y));
-      if (detail === 'hero') {
-        // Open florets below, opening ones above, and tight buds at the very tip.
-        // (Snapdragons, though bell-like in the garden, face out and a little up, held close.)
-        const snap = hints.floret === 'snap' || hints.floret === 'saucer';
-        const hang = f.bell && !snap;
-        const dir = d.clone().multiplyScalar(hang ? 0.75 : 0.9).addScaledVector(UP, hang ? -0.55 : snap ? 0.35 : 0.25).normalize();
-        const p = attach.clone().addScaledVector(d, size * (snap ? 0.18 : 0.35));
-        tube(m, [attach, p], size * 0.06, size * 0.05, STEM, 3);
-        if (t > 0.82) blob(m, p, new THREE.Vector3(size * 0.3, size * 0.45, size * 0.3), WHITE, { petal: true, hinge: p });
-        else floret(m, hints.floret ?? (f.bell ? 'bell' : 'star'), p, dir, size * (t > 0.68 ? 0.75 : 1), hints.floretPetals ?? 5, rng, hints.speckles ? new THREE.Color(hints.speckles) : undefined);
-        continue;
-      }
       let g: THREE.BufferGeometry;
       if (f.bell) {
         // Foxglove bells: open cones hanging outward and down.
@@ -1965,7 +1677,7 @@ export class Flowers {
    * What a close-up of this plant needs: its species and variant, where it stands, its colours
    * and when it was planted (null for plants with no close-up of their own, e.g. leafy clumps).
    */
-  heroInfo(mesh: THREE.InstancedMesh, index: number): { species: string; variant: number; matrix: THREE.Matrix4; life: number[]; petal: number[]; edge: number[] } | null {
+  plantInfo(mesh: THREE.InstancedMesh, index: number): { species: string; variant: number; matrix: THREE.Matrix4; life: number[]; petal: number[]; edge: number[] } | null {
     const species = mesh.userData.species as string | undefined;
     if (!species) return null;
     const g = mesh.geometry.attributes;
