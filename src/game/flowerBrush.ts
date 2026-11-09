@@ -14,6 +14,8 @@ const EDGE_RADIUS = 0.67; // how far a bed reaches from its stroke (for keeping 
 const FLOWER_SCALE = 1.2;
 /** Gap between flowers, as a multiple of each species' natural spacing (was 0.62: too dense). */
 const SPACING = 1.05;
+/** Water flowers pack tighter than land ones: a pond is covered with pads and spikes, not dotted. */
+const WATER_PACK = 0.55;
 /** Minimum gap between leafy clumps. */
 const FOLIAGE_SPACING = 0.55;
 const SEED_BROWN = '#8a6a44'; // dry seed heads
@@ -303,7 +305,8 @@ export class FlowerBrush {
    */
   private waterDab(c: THREE.Vector2) {
     const drift: Partial<Record<'deep' | 'shallow' | 'bank', FlowerSpecies | null>> = {};
-    for (let i = 0; i < 10; i++) {
+    // (As many tries as a bed gets, so a stroke fills the water rather than leaving gaps.)
+    for (let i = 0; i < 22; i++) {
       const a = this.rng() * Math.PI * 2;
       const r = Math.sqrt(this.rng()) * PLANT_RADIUS * 1.15;
       const x = c.x + Math.cos(a) * r;
@@ -312,7 +315,7 @@ export class FlowerBrush {
       if (!zone) continue;
       if (drift[zone] === undefined || this.rng() < 0.3) drift[zone] = this.pickWater(zone);
       const sp = drift[zone];
-      if (!sp || this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING)) continue;
+      if (!sp || this.flowers.isCrowded(x, z, sp.spacing * FLOWER_SCALE * SPACING * WATER_PACK)) continue;
       const { color, edge } = this.plantColour(sp);
       const y = zone === 'bank' ? this.ground.heightAt(x, z) - 0.01 : (this.water.level(x, z) ?? this.ground.heightAt(x, z)) - 0.004;
       const delay = this.strokeTime * 0.2 + 0.1 + (r / PLANT_RADIUS) * 0.9 + this.rng() * 0.25;
