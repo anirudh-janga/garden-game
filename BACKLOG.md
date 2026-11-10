@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current stories:** Milestone 9 (smooth everywhere): 9.1–9.5 are being built in order, each in its own PR. Earlier 👀 stories still wait for review.
+**Current stories:** Milestone 9 (smooth everywhere). 9.1 is live (👀). **9.2 is in progress on branch `story/9.2-draw-whats-on-screen`**; 9.3–9.5 follow. **Read `HANDOFF.md` first**: it has the state of 9.2, the plans for 9.3–9.5, the test tools in `tools/perf/` and the baseline numbers. Earlier 👀 stories still wait for review.
 **Preview URL:** https://anirudh-janga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -79,7 +79,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 8.1 Light and colour, in watercolour and ink | ↩️ Reverted | Built (painted two-tone light, ink lines from depth, watercolour grade, paper grain), reviewed, then reverted at the player's request along with any painting style (see the feedback log). |
 | 8.5 Soft light, fewer insects | 👀 Awaiting feedback | No painting style: the garden's original rendering, in soft daylight (bright overcast / window light): the sun turned well down, the sky's broad, whiter light doing most of the work, shading that wraps gently round each form so flower detail shows; nothing blown out. Far fewer insects and drifting specks. Rose detail, red-rose rims and the box-ball fixes stay. |
 | 9.1 No shader hitches | 👀 Awaiting feedback | Shaders are no longer built in the middle of play. Doing everything once from an empty garden (every tool, every weather, every hour, a cottage restyle, waiting for creatures) used to build 32 shaders mid-play; now it builds 1. Causes fixed: the loading-screen warm-up compiled shaders for the wrong target (so each was compiled again on first use; the loading screen now compiles 51 instead of 74); per-item tints arrived with the first stone or post and forced a new shader; restyling the cottage threw its shaders away and rebuilt them; bees, birds, bunnies and ducks brought their shaders when they first arrived. The blocking check on each shader's first use is off in the shipped game. |
-| 9.2 Draw only what's on screen | ⬜ Not started | |
+| 9.2 Draw only what's on screen | 🔨 In progress | Code is written and pushed on branch `story/9.2-draw-whats-on-screen` (flowers, stones, fences, vines, edge and pond plants kept as a mesh per 10 m patch of ground, so off-screen patches aren't drawn). Checked: every built piece is exactly where it was on two gardens. Not yet measured or merged: the remaining steps are in `HANDOFF.md`. |
 | 9.3 Real far shapes | ⬜ Not started | |
 | 9.4 Faster undo | ⬜ Not started | |
 | 9.5 Fewer draw calls | ⬜ Not started | |

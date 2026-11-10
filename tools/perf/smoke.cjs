@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+const fs = require('fs');
+const link = fs.readFileSync(require('path').join(__dirname, 'garden-link.txt'), 'utf8').trim();
+const hash = link.slice(link.indexOf('#'));
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 200)); });
+  await page.addInitScript(() => localStorage.clear());
+  await page.goto(`http://localhost:${process.env.PORT || 4173}/?q=5${hash}`, { timeout: 600000 });
+  await page.waitForFunction(() => !document.getElementById('loader'), null, { timeout: 600000 });
+  await page.waitForTimeout(8000);
+  const cdp = await page.context().newCDPSession(page);
+  const tap = async (x, y) => { await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 0 }] }); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+  await tap(200, 560);
+  await page.waitForTimeout(2500);
+  console.log('in-bed class:', await page.evaluate(() => document.body.classList.contains('in-bed')));
+  console.log('leftover UI:', await page.evaluate(() => ['.bunch', '.bed-back', '.points-hud', '.bouquet-card'].map((s) => s + '=' + !!document.querySelector(s))));
+  await page.screenshot({ path: 'smoke.png' });
+  console.log('errors:', errors.length ? errors.slice(0, 5) : 'none');
+  await browser.close();
+})();
