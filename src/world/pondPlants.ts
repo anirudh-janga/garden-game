@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tintable } from '../render/touch';
 import type { Season } from './season';
 import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -156,7 +157,7 @@ export class PondPlants {
   }
 
   private mesh(geo: THREE.BufferGeometry, mat: THREE.Material, shadow: boolean) {
-    const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
+    const mesh = tintable(new THREE.InstancedMesh(geo, mat, CAPACITY));
     mesh.count = 0;
     mesh.frustumCulled = false;
     mesh.receiveShadow = true;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rehearse } from '../render/warm';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
@@ -151,6 +152,7 @@ export class Bunnies {
 
   constructor(private readonly world: BunnyWorld) {
     this.nextFamily = lerp(25, 60, this.rng());
+    this.group.add(rehearse(buildBunny(COATS[0], false, createRng(1)).root));
   }
 
   private get all(): Bunny[] {

@@ -69,14 +69,24 @@ export class Cottage {
     if (animate) this.bounce = 0;
   }
 
+  /**
+   * The last cottage's materials, let go only once the new one has been drawn: the new materials
+   * take over the same shaders then. (Let go at once, the shaders went with them and were
+   * compiled all over again for the new cottage: a hitch on every change of look.)
+   */
+  private stale: THREE.Material[] = [];
+  private staleFrames = 0;
+
   private build() {
+    this.staleFrames = 0;
     const g = this.group;
     // Clear out the old cottage (it's only ever a few hundred small meshes).
     for (const child of [...g.children]) {
       child.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           o.geometry.dispose();
-          (o.material as THREE.Material).dispose();
+          // (Its material is let go a little later: see `stale`.)
+          this.stale.push(o.material as THREE.Material);
         }
       });
       g.remove(child);
@@ -511,6 +521,10 @@ export class Cottage {
   }
 
   update(dt: number, wind: WindField) {
+    if (this.stale.length && ++this.staleFrames > 3) {
+      for (const m of this.stale) m.dispose();
+      this.stale = [];
+    }
     this.smoke.update(dt, wind);
     this.chimeSet?.update(dt, wind.direction, wind.sample(this.position.x, this.position.z + 2));
     if (this.bounce < 1) {

@@ -168,6 +168,21 @@ export class PostFX {
     this.black.needsUpdate = true;
   }
 
+  /**
+   * Compile every material in the scene ahead of use, as it will really be drawn: into the scene
+   * target, not straight to the screen (the two need different shaders: compiled for the screen,
+   * every one was compiled a second time, mid-play, the first time it was drawn).
+   */
+  warm(): Promise<unknown> {
+    const r = this.renderer;
+    const before = r.getRenderTarget();
+    r.setRenderTarget(this.sceneRT);
+    // (The shaders are made at once, while the target is set; the promise is their compiling.)
+    const compiled = r.compileAsync(this.scene, this.camera);
+    r.setRenderTarget(before);
+    return compiled.catch(() => {});
+  }
+
   /** MSAA sample count for the scene (0 turns antialiasing off). */
   setSamples(samples: number) {
     if (samples === this.samples) return;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { addWet } from '../render/wet';
-import { touch } from '../render/touch';
+import { touch, tintable } from '../render/touch';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
@@ -137,7 +137,7 @@ export class Boulders {
     for (let k = 0; k < SHAPES; k++) {
       const geo = boulderGeometry(4100 + k * 37);
       geo.setAttribute('aMossStart', new THREE.InstancedBufferAttribute(new Float32Array(CAPACITY).fill(1e9), 1));
-      const mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
+      const mesh = tintable(new THREE.InstancedMesh(geo, mat, CAPACITY));
       mesh.count = 0;
       mesh.castShadow = true;
       mesh.receiveShadow = true;

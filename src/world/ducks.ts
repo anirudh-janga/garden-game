@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rehearse } from '../render/warm';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createNoise2D } from '../core/noise';
 import { createRng, lerp } from '../core/random';
@@ -229,7 +230,9 @@ export class Ducks {
   private ambient = 15;
   private wakeSlot = 0;
 
-  constructor(private readonly world: DuckWorld) {}
+  constructor(private readonly world: DuckWorld) {
+    this.group.add(rehearse(buildDuck('hen', createRng(1)).root));
+  }
 
   private get all(): Duck[] {
     return this.families.flatMap((f) => f.ducks);

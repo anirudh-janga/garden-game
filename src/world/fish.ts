@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tintable } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -139,7 +140,7 @@ export class Fish {
         );
     };
     VARIETIES.forEach((v, k) => {
-      const mesh = new THREE.InstancedMesh(fishGeometry(v, 40 + k * 7), mat, CAPACITY);
+      const mesh = tintable(new THREE.InstancedMesh(fishGeometry(v, 40 + k * 7), mat, CAPACITY));
       const swim = new THREE.InstancedBufferAttribute(new Float32Array(CAPACITY * 2), 2);
       swim.setUsage(THREE.DynamicDrawUsage);
       mesh.geometry.setAttribute('aSwim', swim);

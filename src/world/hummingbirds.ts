@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rehearse } from '../render/warm';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import type { Season } from './season';
@@ -118,6 +119,7 @@ export class Hummingbirds {
     private readonly world: HummingbirdWorld,
   ) {
     this.cap = season === 'winter' ? 0 : season === 'autumn' ? 1 : MAX;
+    if (this.cap) this.group.add(rehearse(build(KINDS[0]).group));
   }
 
   /** How loud their wing-hum should be at `ear` (0 when none is close). */

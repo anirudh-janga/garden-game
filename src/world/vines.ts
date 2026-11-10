@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { climbingRoseGeometry } from './flowers';
-import { touch } from '../render/touch';
+import { touch, tintable } from '../render/touch';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { regrow } from '../core/regrow';
@@ -154,7 +154,7 @@ export class Vines {
             transformed *= grow * (2.0 - grow);`,
           );
       };
-      const mesh = new THREE.InstancedMesh(geos[part], mat, CAP[part]);
+      const mesh = tintable(new THREE.InstancedMesh(geos[part], mat, CAP[part]));
       mesh.count = 0;
       mesh.frustumCulled = false;
       mesh.receiveShadow = true;
