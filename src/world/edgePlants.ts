@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import { Patches, sharedGeometry } from '../render/patches';
 import { touch, tintable } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 
-const CAPACITY = 1600;
+const CAPACITY = 256; // per patch of ground (a full patch gets another mesh)
 
 function colored(g: THREE.BufferGeometry, hex: string): THREE.BufferGeometry {
   const c = new THREE.Color(hex);
@@ -82,8 +83,9 @@ interface Growing {
  */
 export class EdgePlants {
   readonly group = new THREE.Group();
-  private readonly clover: THREE.InstancedMesh;
-  private readonly daisies: THREE.InstancedMesh;
+  /** A mesh per patch of ground (so only patches on screen are drawn). */
+  private readonly clover: Patches;
+  private readonly daisies: Patches;
   private readonly growing: Growing[] = [];
   private readonly all: Growing[] = [];
   private readonly wilting: { g: Growing; t: number }[] = [];
@@ -95,20 +97,21 @@ export class EdgePlants {
   constructor(private readonly flowerTints: string[]) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     addWind(mat, 'clamp(position.y * 7.0, 0.0, 1.0)', undefined, 2.0);
-    this.clover = tintable(new THREE.InstancedMesh(cloverGeometry(3), mat, CAPACITY));
-    this.daisies = tintable(new THREE.InstancedMesh(daisyGeometry(9), mat, CAPACITY));
-    for (const mesh of [this.clover, this.daisies]) {
-      mesh.count = 0;
-      mesh.frustumCulled = false;
-      mesh.receiveShadow = true;
-      this.group.add(mesh);
-    }
+    const patches = (shape: THREE.BufferGeometry) =>
+      new Patches(() => {
+        const mesh = tintable(new THREE.InstancedMesh(sharedGeometry(shape), mat, CAPACITY));
+        mesh.frustumCulled = false;
+        mesh.receiveShadow = true;
+        this.group.add(mesh);
+        return mesh;
+      });
+    this.clover = patches(cloverGeometry(3));
+    this.daisies = patches(daisyGeometry(9));
   }
 
   add(x: number, y: number, z: number, delay: number) {
     const isFlower = this.rng() < 0.4;
-    const mesh = isFlower ? this.daisies : this.clover;
-    if (mesh.count >= CAPACITY) return;
+    const mesh = (isFlower ? this.daisies : this.clover).at(x, z);
     const index = mesh.count++;
     const tint = isFlower
       ? new THREE.Color(this.flowerTints[Math.floor(this.rng() * this.flowerTints.length)]).lerp(new THREE.Color('#ffffff'), 0.45)
@@ -123,7 +126,8 @@ export class EdgePlants {
 
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
-    this.clover.count = this.daisies.count = 0;
+    this.clover.reset();
+    this.daisies.reset();
     this.growing.length = this.all.length = this.wilting.length = 0;
     this.rng = createRng(77);
   }

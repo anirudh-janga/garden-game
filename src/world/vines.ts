@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Patches, sharedGeometry } from '../render/patches';
 import { climbingRoseGeometry } from './flowers';
 import { touch, tintable } from '../render/touch';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -11,7 +12,8 @@ export type VineKind = 'rose' | 'clematis' | 'honeysuckle' | 'ivy' | 'wisteria';
 const STEP = 0.07; // metres of stem between leaf nodes
 /** Storybook scale (like the birds and bees): life-size leaves and roses vanish from the garden camera. */
 const BIG = 2.3;
-const CAP = { stem: 9000, leaf: 14000, ivy: 9000, rose: 2400, star: 2400, trumpet: 2400, raceme: 1200 };
+/** Per part in one patch of ground (a full patch gets another mesh). */
+const CAP = { stem: 1024, leaf: 1536, ivy: 1024, rose: 256, star: 256, trumpet: 256, raceme: 128 };
 
 type Part = keyof typeof CAP;
 
@@ -110,7 +112,7 @@ export interface ClimbOptions {
 }
 
 interface Placed {
-  part: Part;
+  mesh: THREE.InstancedMesh;
   index: number;
   x: number;
   z: number;
@@ -125,8 +127,8 @@ interface Placed {
  */
 export class Vines {
   readonly group = new THREE.Group();
-  private readonly meshes = {} as Record<Part, THREE.InstancedMesh>;
-  private readonly life = {} as Record<Part, THREE.InstancedBufferAttribute>;
+  /** Each part's pieces, a mesh per patch of ground (so only patches on screen are drawn). */
+  private readonly meshes = {} as Record<Part, Patches>;
   private readonly placed: Placed[] = [];
   private readonly uniforms = { uVineTime: { value: 0 } };
   private readonly m = new THREE.Matrix4();
@@ -154,21 +156,20 @@ export class Vines {
             transformed *= grow * (2.0 - grow);`,
           );
       };
-      const mesh = tintable(new THREE.InstancedMesh(geos[part], mat, CAP[part]));
-      mesh.count = 0;
-      mesh.frustumCulled = false;
-      mesh.receiveShadow = true;
-      const life = new THREE.InstancedBufferAttribute(new Float32Array(CAP[part] * 2), 2);
-      geos[part].setAttribute('aLife', life);
-      this.group.add(mesh);
-      this.meshes[part] = mesh;
-      this.life[part] = life;
+      this.meshes[part] = new Patches(() => {
+        const geo = sharedGeometry(geos[part]);
+        geo.setAttribute('aLife', new THREE.InstancedBufferAttribute(new Float32Array(CAP[part] * 2), 2));
+        const mesh = tintable(new THREE.InstancedMesh(geo, mat, CAP[part]));
+        mesh.frustumCulled = false;
+        mesh.receiveShadow = true;
+        this.group.add(mesh);
+        return mesh;
+      });
     }
   }
 
   private add(part: Part, pos: THREE.Vector3, dir: THREE.Vector3, roll: number, scale: THREE.Vector3, color: THREE.Color, start: number, owner: number) {
-    const mesh = this.meshes[part];
-    if (mesh.count >= CAP[part]) return;
+    const mesh = this.meshes[part].at(pos.x, pos.z);
     const i = mesh.count++;
     this.q.setFromUnitVectors(this.up, dir.clone().normalize());
     this.q.multiply(new THREE.Quaternion().setFromAxisAngle(this.up, roll));
@@ -176,9 +177,10 @@ export class Vines {
     mesh.setColorAt(i, color);
     touch(mesh.instanceMatrix, i);
     if (mesh.instanceColor) touch(mesh.instanceColor, i);
-    this.life[part].setXY(i, start, 1e9);
-    touch(this.life[part], i);
-    this.placed.push({ part, index: i, x: pos.x, z: pos.z, owner });
+    const life = mesh.geometry.attributes.aLife as THREE.InstancedBufferAttribute;
+    life.setXY(i, start, 1e9);
+    touch(life, i);
+    this.placed.push({ mesh, index: i, x: pos.x, z: pos.z, owner });
   }
 
   /**
@@ -288,7 +290,7 @@ export class Vines {
     for (let i = this.placed.length - 1; i >= 0; i--) {
       const p = this.placed[i];
       if (!test(p)) continue;
-      const life = this.life[p.part];
+      const life = p.mesh.geometry.attributes.aLife as THREE.InstancedBufferAttribute;
       life.setY(p.index, Math.min(life.getY(p.index), t));
       touch(life, p.index);
       this.placed.splice(i, 1);
@@ -299,7 +301,7 @@ export class Vines {
 
   reset() {
     this.placed.length = 0;
-    for (const part of Object.keys(CAP) as Part[]) this.meshes[part].count = 0;
+    for (const part of Object.keys(CAP) as Part[]) this.meshes[part].reset();
   }
 
   update(dt: number) {

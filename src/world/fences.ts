@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Patches, sharedGeometry } from '../render/patches';
 import { touch, tintable } from '../render/touch';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -21,7 +22,8 @@ const cellKey = (x: number, z: number) => Math.floor(x) * 4096 + Math.floor(z);
 
 export type Arrival = 'drop' | 'pop' | 'grow';
 
-const CAPACITY: Record<PartShape, number> = { picketPost: 600, picket: 5000, rail: 1500, logPost: 600, log: 1500, hedge: 2500, wallStone: 2500 };
+/** Per shape in one patch of ground (a full patch gets another mesh). */
+const CAPACITY: Record<PartShape, number> = { picketPost: 64, picket: 512, rail: 128, logPost: 64, log: 128, hedge: 256, wallStone: 256 };
 const VARIANTS: Record<PartShape, number> = { picketPost: 3, picket: 4, rail: 2, logPost: 4, log: 4, hedge: 5, wallStone: 6 };
 
 /** As separate triangles (some stock shapes already are: they'd warn if asked again). */
@@ -207,7 +209,8 @@ export interface Part {
  */
 export class Fences {
   readonly group = new THREE.Group();
-  private readonly meshes = new Map<PartShape, THREE.InstancedMesh[]>();
+  /** Each shape's pieces, a mesh per patch of ground (so only patches on screen are drawn). */
+  private readonly meshes = new Map<PartShape, Patches[]>();
   private readonly parts = new Map<number, Part>();
   /** Posts, hedges and wall stones by 1 m cell, so "is anything solid here?" needn't scan every part. */
   private readonly cells = new Map<number, Part[]>();
@@ -263,17 +266,21 @@ export class Fences {
         );
     }, 0.12);
     (Object.keys(BUILD) as PartShape[]).forEach((shape, si) => {
-      const list: THREE.InstancedMesh[] = [];
+      const list: Patches[] = [];
       for (let k = 0; k < VARIANTS[shape]; k++) {
-        const geo = BUILD[shape](900 + si * 40 + k * 7);
-        if (shape === 'wallStone') mossAttribute(geo, CAPACITY[shape]);
-        const mesh = tintable(new THREE.InstancedMesh(geo, shape === 'hedge' ? hedge : shape === 'wallStone' ? stone : wood, CAPACITY[shape]));
-        mesh.count = 0;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
-        list.push(mesh);
-        this.group.add(mesh);
+        const built = BUILD[shape](900 + si * 40 + k * 7);
+        list.push(
+          new Patches(() => {
+            const geo = sharedGeometry(built);
+            if (shape === 'wallStone') mossAttribute(geo, CAPACITY[shape]);
+            const mesh = tintable(new THREE.InstancedMesh(geo, shape === 'hedge' ? hedge : shape === 'wallStone' ? stone : wood, CAPACITY[shape]));
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.frustumCulled = false;
+            this.group.add(mesh);
+            return mesh;
+          }),
+        );
       }
       this.meshes.set(shape, list);
     });
@@ -281,7 +288,7 @@ export class Fences {
 
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
-    for (const list of this.meshes.values()) for (const m of list) m.count = 0;
+    for (const list of this.meshes.values()) for (const p of list) p.reset();
     this.parts.clear();
     this.cells.clear();
     this.moving.clear();
@@ -297,8 +304,7 @@ export class Fences {
 
   add(shape: PartShape, pos: THREE.Vector3, quat: THREE.Quaternion, scale: THREE.Vector3, tint: THREE.Color, arrival: Arrival, delay: number, owner: number, half = 0): Part | null {
     const list = this.meshes.get(shape)!;
-    const mesh = list[Math.floor(this.rng() * list.length)];
-    if (mesh.count >= CAPACITY[shape]) return null;
+    const mesh = list[Math.floor(this.rng() * list.length)].at(pos.x, pos.z);
     const index = mesh.count++;
     mesh.setColorAt(index, tint);
     if (mesh.instanceColor) touch(mesh.instanceColor, index);

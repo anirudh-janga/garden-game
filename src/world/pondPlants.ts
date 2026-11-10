@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Patches, sharedGeometry } from '../render/patches';
 import { tintable } from '../render/touch';
 import type { Season } from './season';
 import { regrow } from '../core/regrow';
@@ -6,7 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 
-const CAPACITY = 600;
+const CAPACITY = 128; // per patch of ground (a full patch gets another mesh)
 
 function colorize(g: THREE.BufferGeometry, color: (x: number, y: number, z: number) => THREE.Color): THREE.BufferGeometry {
   const pos = g.attributes.position;
@@ -135,9 +136,10 @@ interface Item {
 /** Lily pads (some in flower) drifting up on the water, and reeds and bulrushes round the edge. */
 export class PondPlants {
   readonly group = new THREE.Group();
-  private readonly pads: THREE.InstancedMesh[] = [];
-  private readonly lilies: THREE.InstancedMesh;
-  private readonly reeds: THREE.InstancedMesh[] = [];
+  /** A mesh per patch of ground for each shape (so only patches on screen are drawn). */
+  private readonly pads: Patches[] = [];
+  private readonly lilies: Patches;
+  private readonly reeds: Patches[] = [];
   private readonly items: Item[] = [];
   private readonly growing: Item[] = [];
   private readonly wilting: { it: Item; t: number }[] = [];
@@ -156,18 +158,19 @@ export class PondPlants {
     for (let k = 0; k < 3; k++) this.reeds.push(this.mesh(reedGeometry(21 + k * 9, k === 2), reedMat, true));
   }
 
-  private mesh(geo: THREE.BufferGeometry, mat: THREE.Material, shadow: boolean) {
-    const mesh = tintable(new THREE.InstancedMesh(geo, mat, CAPACITY));
-    mesh.count = 0;
-    mesh.frustumCulled = false;
-    mesh.receiveShadow = true;
-    mesh.castShadow = shadow;
-    this.group.add(mesh);
-    return mesh;
+  private mesh(shape: THREE.BufferGeometry, mat: THREE.Material, shadow: boolean) {
+    return new Patches(() => {
+      const mesh = tintable(new THREE.InstancedMesh(sharedGeometry(shape), mat, CAPACITY));
+      mesh.frustumCulled = false;
+      mesh.receiveShadow = true;
+      mesh.castShadow = shadow;
+      this.group.add(mesh);
+      return mesh;
+    });
   }
 
-  private add(mesh: THREE.InstancedMesh, x: number, y: number, z: number, size: number, tint: THREE.Color, delay: number, reed: boolean) {
-    if (mesh.count >= CAPACITY) return;
+  private add(patches: Patches, x: number, y: number, z: number, size: number, tint: THREE.Color, delay: number, reed: boolean) {
+    const mesh = patches.at(x, z);
     const index = mesh.count++;
     mesh.setColorAt(index, tint);
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -214,7 +217,7 @@ export class PondPlants {
 
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
-    for (const m of [...this.pads, this.lilies, ...this.reeds]) m.count = 0;
+    for (const p of [...this.pads, this.lilies, ...this.reeds]) p.reset();
     this.items.length = this.growing.length = this.wilting.length = 0;
     this.rng = createRng(606);
   }

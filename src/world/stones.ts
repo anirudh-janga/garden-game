@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Patches, sharedGeometry } from '../render/patches';
 import { addWet } from '../render/wet';
 import { addMoss, mossAttribute, mossStart } from '../render/moss';
 import { touch, tintable } from '../render/touch';
@@ -8,7 +9,7 @@ import { createRng, hashJitter, lerp } from '../core/random';
 
 export type StoneKind = 'step' | 'shore';
 const SHAPES: Record<StoneKind, number> = { step: 8, shore: 7 };
-const CAPACITY = 2000; // per shape
+const CAPACITY = 256; // per shape in one patch of ground (a full patch gets another mesh)
 const CELL = 0.5; // spatial hash cell, metres
 
 /**
@@ -145,7 +146,8 @@ interface Falling {
  */
 export class Stones {
   readonly group = new THREE.Group();
-  private readonly meshes = new Map<StoneKind, THREE.InstancedMesh[]>();
+  /** Each shape's stones, a mesh per patch of ground (so only patches on screen are drawn). */
+  private readonly meshes = new Map<StoneKind, Patches[]>();
   private readonly falling: Falling[] = [];
   private readonly sinking: { stone: Placed; t: number }[] = [];
   private readonly grid = new Map<string, Placed[]>();
@@ -167,18 +169,21 @@ export class Stones {
     };
     const mats: Record<StoneKind, THREE.MeshLambertMaterial> = { step: material(true), shore: material(false) };
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind) => {
-      const list: THREE.InstancedMesh[] = [];
+      const list: Patches[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const geo = kind === 'shore' ? shoreGeometry(900 + k * 23) : stepGeometry(550 + k * 13); // (the seeds they've always had)
-        mossAttribute(geo, CAPACITY);
-        const mesh = tintable(new THREE.InstancedMesh(geo, mats[kind], CAPACITY));
-        mesh.count = 0;
-        mesh.visible = false; // drawn only once something of this shape is laid
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
-        list.push(mesh);
-        this.group.add(mesh);
+        const shape = kind === 'shore' ? shoreGeometry(900 + k * 23) : stepGeometry(550 + k * 13); // (the seeds they've always had)
+        list.push(
+          new Patches(() => {
+            const geo = sharedGeometry(shape);
+            mossAttribute(geo, CAPACITY);
+            const mesh = tintable(new THREE.InstancedMesh(geo, mats[kind], CAPACITY));
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.frustumCulled = false;
+            this.group.add(mesh);
+            return mesh;
+          }),
+        );
       }
       this.meshes.set(kind, list);
     });
@@ -259,10 +264,8 @@ export class Stones {
 
   add(kind: StoneKind, x: number, y: number, z: number, scale: THREE.Vector3, yaw: number, r: number, tone: THREE.Color, delay: number, owner = 0) {
     const list = this.meshes.get(kind)!;
-    const mesh = list[Math.floor(this.rng() * list.length)];
-    if (mesh.count >= CAPACITY) return;
+    const mesh = list[Math.floor(this.rng() * list.length)].at(x, z);
     const index = mesh.count++;
-    mesh.visible = true;
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) touch(mesh.instanceColor, index);
     const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r, owner };
@@ -286,12 +289,7 @@ export class Stones {
 
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
-    for (const list of this.meshes.values()) {
-      for (const m of list) {
-        m.count = 0;
-        m.visible = false;
-      }
-    }
+    for (const list of this.meshes.values()) for (const p of list) p.reset();
     this.falling.length = 0;
     this.sinking.length = 0;
     this.grid.clear();
