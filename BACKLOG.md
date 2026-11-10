@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current stories:** Milestone 7 (bouquets, close-up view, pruning and points) has been removed at the player's request. The remaining 👀 stories (3.x, 4.x and earlier) still wait for review.
+**Current stories:** Milestone 9 (smooth everywhere): 9.1–9.5 are being built in order, each in its own PR. Earlier 👀 stories still wait for review.
 **Preview URL:** https://anirudh-janga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -78,12 +78,18 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 7.7 My bouquet collection, and points | ↩️ Removed | Built (sell bouquets for points, a collection book), then removed at the player's request. |
 | 8.1 Light and colour, in watercolour and ink | ↩️ Reverted | Built (painted two-tone light, ink lines from depth, watercolour grade, paper grain), reviewed, then reverted at the player's request along with any painting style (see the feedback log). |
 | 8.5 Soft light, fewer insects | 👀 Awaiting feedback | No painting style: the garden's original rendering, in soft daylight (bright overcast / window light): the sun turned well down, the sky's broad, whiter light doing most of the work, shading that wraps gently round each form so flower detail shows; nothing blown out. Far fewer insects and drifting specks. Rose detail, red-rose rims and the box-ball fixes stay. |
+| 9.1 No shader hitches | 👀 Awaiting feedback | Shaders are no longer built in the middle of play. Doing everything once from an empty garden (every tool, every weather, every hour, a cottage restyle, waiting for creatures) used to build 32 shaders mid-play; now it builds 1. Causes fixed: the loading-screen warm-up compiled shaders for the wrong target (so each was compiled again on first use; the loading screen now compiles 51 instead of 74); per-item tints arrived with the first stone or post and forced a new shader; restyling the cottage threw its shaders away and rebuilt them; bees, birds, bunnies and ducks brought their shaders when they first arrived. The blocking check on each shader's first use is off in the shipped game. |
+| 9.2 Draw only what's on screen | ⬜ Not started | |
+| 9.3 Real far shapes | ⬜ Not started | |
+| 9.4 Faster undo | ⬜ Not started | |
+| 9.5 Fewer draw calls | ⬜ Not started | |
 
 Status legend: ↩️ Reverted · ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **Make it smooth (Milestone 9):** *Feedback:* "Can you identify performance improvement paths that can make the gameplay super smooth and jank free", then "Yeah add stories and implement them one by one until all are done." *Changes:* measured the player's garden (numbers under Milestone 9) and added stories 9.1–9.5, built in order. Still unknown: how costly the pixels are on the iPhone itself (resolution, antialiasing, glow); the player can tell by comparing `?fps&q=7` with `?fps&q=0` on their garden.
 - **Sparse water flowers (review 11):** *Feedback:* "The water flowers are sparse, can we make them tighter by default or have a mode to switch it?" *Changes:* tighter by default, no switch. Painting over a pond now tries as many spots as a bed does (22 instead of 10), and water plants pack at 55% of their usual gap (land beds unchanged). Measured in a test pond: 4.3 water plants per square metre before, 11.2 after. Lilies and lotus fill more of the pond; the small hyacinth clusters fill the gaps between pads.
 - **Remove close-up view, bouquets and points (review 10):** *Feedback:* "Instead of triangles can we use polygons? Better edges right?" (the GPU draws triangles only; a polygon is split into triangles before it's drawn, so edge quality comes from the shapes, not the primitive; no change made). "Remove the close up display, bouquet making and points that are not working in terms of gameplay … they don't work as good gameplay and feels like slop. Just remove these features, close up view, bouquet making and points." *Changes:* removed the close-up bed view (camera and UI), pruning (cut into a bunch), bouquet making (tying, the turntable and the bouquet card), and points and the collection (selling, the book, and the points pill). Backups no longer carry bouquets or points; older backups still open (their extra data is ignored). The garden's own flower shapes are unchanged.
 - **Remove the close-up details (review 9):** *Feedback:* "Let's get rid of the feature where we add details to the flowers on click, it's jarring, add the high quality details directly on main" (then, after measuring that full detail on every plant would be about 46M triangles on this garden): "Remove details, i don't see it adds anything significant". *Changes:* the close-up swap (the bed's flowers replaced by detailed copies on going close) and its detailed builders are removed. Going close to a bed no longer changes any flowers; pruning still works, on the garden plants themselves. Bouquet stems use the garden shapes too. The garden's flower shapes are byte-identical to before (checked on all 443 shape variants).
@@ -757,6 +763,28 @@ What the references share: warm, high-key daylight; shade that is coloured (lave
 
 ### Story 8.5 — Make it the garden's look (S)
 - Once the player is happy: the storybook look becomes the default (the painted look stays as an option), tuned through the day, the seasons and the weather.
+
+## Milestone 9 — Smooth everywhere *(requested by the player)*
+
+> "Can you identify performance improvement paths that can make the gameplay super smooth and jank free" … "Yeah add stories and implement them one by one until all are done."
+
+Measured on the player's own garden (274 strokes, about 2,900 flower plants): zoomed right out it draws 468 draw calls and 2.56M triangles a frame (flowers 0.9M, stepping stones 0.29M, forest and ground 0.31M, vines 0.15M, fences 0.12M); zoomed in close it still draws about 1.6M, though only 0.14–0.25M of what was built is on screen; the far flower shapes are only 4% lighter than the near ones; script time is about 6–7 ms a frame, mostly issuing draw calls; one undo takes 2.2 s; and shaders are compiled, and checked with a blocking call, in the middle of play.
+
+### Story 9.1 — No shader hitches (S)
+- Nothing is compiled in the middle of play: every shader the garden can need (creatures that arrive later, markers, cottage parts) is compiled behind the loading screen.
+- The blocking check on each shader's first use is off in the shipped game.
+
+### Story 9.2 — Draw only what's on screen (M)
+- Flowers, stones, fences, vines, edge plants and pond plants are skipped when they're off screen (trees and the meadow already are), so a big garden costs what's in view, not what's been built.
+
+### Story 9.3 — Real far shapes (M)
+- Far away, plants and stones use shapes that are truly lighter (a fraction of the triangles), chosen so the whole garden looks the same from there; checked with before-and-after pictures.
+
+### Story 9.4 — Faster undo (L)
+- Undo no longer rebuilds the whole garden: a big garden undoes in a blink.
+
+### Story 9.5 — Fewer draw calls (M)
+- Far fewer separate things to draw each frame (flower shape variants shared, small meshes merged), so less script time per frame.
 
 ## Parking lot (ideas to revisit)
 

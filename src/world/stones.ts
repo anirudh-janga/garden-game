@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { addWet } from '../render/wet';
 import { addMoss, mossAttribute, mossStart } from '../render/moss';
-import { touch } from '../render/touch';
+import { touch, tintable } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, hashJitter, lerp } from '../core/random';
@@ -171,7 +171,7 @@ export class Stones {
       for (let k = 0; k < SHAPES[kind]; k++) {
         const geo = kind === 'shore' ? shoreGeometry(900 + k * 23) : stepGeometry(550 + k * 13); // (the seeds they've always had)
         mossAttribute(geo, CAPACITY);
-        const mesh = new THREE.InstancedMesh(geo, mats[kind], CAPACITY);
+        const mesh = tintable(new THREE.InstancedMesh(geo, mats[kind], CAPACITY));
         mesh.count = 0;
         mesh.visible = false; // drawn only once something of this shape is laid
         mesh.castShadow = true;

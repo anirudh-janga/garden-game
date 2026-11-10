@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rehearse } from '../render/warm';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 
@@ -144,7 +145,10 @@ export class PerchingBirds {
     private readonly perches: () => Perch[],
     private readonly edgePoint: (angle: number) => THREE.Vector3,
     private readonly onChirp: (at: THREE.Vector3) => void,
-  ) {}
+  ) {
+    // (With a generator of its own, so the birds themselves come and go just as before.)
+    this.group.add(rehearse(buildBird(KINDS[0], createRng(1)).group));
+  }
 
   /** A free perch (no other bird within a hand's width). */
   private pickPerch(list: Perch[]): Perch | null {

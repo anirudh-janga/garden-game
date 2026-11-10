@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { touch } from '../render/touch';
+import { touch, tintable } from '../render/touch';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, hashJitter, lerp } from '../core/random';
@@ -267,7 +267,7 @@ export class Fences {
       for (let k = 0; k < VARIANTS[shape]; k++) {
         const geo = BUILD[shape](900 + si * 40 + k * 7);
         if (shape === 'wallStone') mossAttribute(geo, CAPACITY[shape]);
-        const mesh = new THREE.InstancedMesh(geo, shape === 'hedge' ? hedge : shape === 'wallStone' ? stone : wood, CAPACITY[shape]);
+        const mesh = tintable(new THREE.InstancedMesh(geo, shape === 'hedge' ? hedge : shape === 'wallStone' ? stone : wood, CAPACITY[shape]));
         mesh.count = 0;
         mesh.castShadow = true;
         mesh.receiveShadow = true;

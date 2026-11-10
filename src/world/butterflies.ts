@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tintable } from '../render/touch';
 import { makeCanvas } from '../engine/env';
 import { createRng, lerp } from '../core/random';
 import type { Season } from './season';
@@ -565,7 +566,7 @@ export class Butterflies {
     this.wings.count = 0;
     this.wings.frustumCulled = false;
     const bodyGeo = new THREE.CapsuleGeometry(0.0024, 0.017, 2, 6).rotateX(Math.PI / 2);
-    this.bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial(), MAX);
+    this.bodies = tintable(new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial(), MAX));
     this.bodies.count = 0;
     this.bodies.frustumCulled = false;
     for (let i = 0; i < MAX; i++) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rehearse } from '../render/warm';
 import { createRng, lerp } from '../core/random';
 
 /** Storybook scale: real bees would be invisible specks from the garden camera. */
@@ -95,7 +96,9 @@ export class Bees {
   constructor(
     private readonly openBlooms: () => THREE.Vector3[],
     private readonly edgePoint: (angle: number) => THREE.Vector3,
-  ) {}
+  ) {
+    this.group.add(rehearse(buildBee(KINDS[0]).group));
+  }
 
   /** How loud the buzz should be for a listener at `ear` (0 when no bee is close). */
   buzzNear(ear: THREE.Vector3): { level: number; pitch: number } {

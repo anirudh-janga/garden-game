@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { touch } from '../render/touch';
+import { touch, tintable } from '../render/touch';
 import { regrow } from '../core/regrow';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
@@ -95,8 +95,8 @@ export class EdgePlants {
   constructor(private readonly flowerTints: string[]) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     addWind(mat, 'clamp(position.y * 7.0, 0.0, 1.0)', undefined, 2.0);
-    this.clover = new THREE.InstancedMesh(cloverGeometry(3), mat, CAPACITY);
-    this.daisies = new THREE.InstancedMesh(daisyGeometry(9), mat, CAPACITY);
+    this.clover = tintable(new THREE.InstancedMesh(cloverGeometry(3), mat, CAPACITY));
+    this.daisies = tintable(new THREE.InstancedMesh(daisyGeometry(9), mat, CAPACITY));
     for (const mesh of [this.clover, this.daisies]) {
       mesh.count = 0;
       mesh.frustumCulled = false;

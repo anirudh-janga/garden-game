@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tintable } from '../render/touch';
 import { createRng, lerp } from '../core/random';
 
 const MAX_BIRDS = 12;
@@ -142,7 +143,7 @@ export class FlyingBirds {
         );
     };
 
-    this.mesh = new THREE.InstancedMesh(geo, mat, MAX_BIRDS);
+    this.mesh = tintable(new THREE.InstancedMesh(geo, mat, MAX_BIRDS));
     this.mesh.count = 0;
     this.mesh.castShadow = false; // far overhead; not worth redrawing shadows for
     this.mesh.frustumCulled = false;

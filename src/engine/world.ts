@@ -159,6 +159,9 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // --- Renderer ---------------------------------------------------------------------------
   const renderer = new THREE.WebGLRenderer({ canvas: canvas as HTMLCanvasElement, antialias: false, powerPreference: 'high-performance' });
   // Neutral keeps the hand-picked palette's hues intact (ACES pushes everything orange-grey).
+  // (Asking a shader whether it compiled makes the game wait for it: a hitch the first time
+  // each one is used. Only worth it while debugging.)
+  renderer.debug.checkShaderErrors = init.debug;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
@@ -980,7 +983,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
 
   // Compile every shader up front (in parallel where supported), so the first pond or bed
   // doesn't hitch while its material compiles.
-  const warmed = renderer.compileAsync(scene, camera).catch(() => {});
+  const warmed = post.warm();
 
   // --- Plant shapes, built ahead of time in a worker of their own -------------------------------
   // (So the first bed of a kind doesn't hitch while its shapes are made. Without the worker, they
@@ -1027,6 +1030,9 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       step();
     });
     regrow.offset = 0;
+    // The saved garden may have brought shaders of its own (a restyled cottage, climbers…): those
+    // are compiled now too, behind the loading screen.
+    await Promise.race([post.warm(), new Promise((r) => setTimeout(r, 4000))]);
     prepareShapes();
     prepareIntro();
   }

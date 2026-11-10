@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rehearse } from '../render/warm';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRng, lerp } from '../core/random';
 import type { Season } from './season';
@@ -111,6 +112,7 @@ export class Dragonflies {
     private readonly ponds: PondAir,
   ) {
     this.enabled = season !== 'winter';
+    if (this.enabled) this.group.add(rehearse(build(KINDS[0]).group));
   }
 
   private aim(f: Dragonfly) {
