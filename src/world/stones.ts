@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Patches, sharedGeometry } from '../render/patches';
+import { Patches, sharedGeometry, swapDetail } from '../render/patches';
 import { addWet } from '../render/wet';
 import { addMoss, mossAttribute, mossStart } from '../render/moss';
 import { touch, tintable } from '../render/touch';
@@ -10,13 +10,14 @@ import { createRng, hashJitter, lerp } from '../core/random';
 export type StoneKind = 'step' | 'shore';
 const SHAPES: Record<StoneKind, number> = { step: 8, shore: 7 };
 const CAPACITY = 256; // per shape in one patch of ground (a full patch gets another mesh)
+const FAR_DETAIL = 40; // metres from the camera beyond which a stone is drawn simpler
 const CELL = 0.5; // spatial hash cell, metres
 
 /**
  * A hand-dressed stepping stone: a rounded-square outline (superellipse) whose corners are each
  * rounded a little differently, with gently wobbling sides and softly bevelled top edges.
  */
-function stepGeometry(seed: number): THREE.BufferGeometry {
+function stepGeometry(seed: number, far = false): THREE.BufferGeometry {
   const rng = createRng(seed);
   const hx = lerp(0.19, 0.23, rng());
   const hz = lerp(0.18, 0.22, rng());
@@ -24,8 +25,8 @@ function stepGeometry(seed: number): THREE.BufferGeometry {
   const wobble = [0, 1, 2].map(() => rng() * Math.PI * 2);
   const shape = new THREE.Shape();
   // (24 points: as smooth as 40 at garden distance, for half the triangles; a long path is
-  // hundreds of stones.)
-  const N = 24;
+  // hundreds of stones. Far away, 12 points and a single bevel step are all that can be seen.)
+  const N = far ? 12 : 24;
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
     const c = Math.cos(a);
@@ -46,7 +47,7 @@ function stepGeometry(seed: number): THREE.BufferGeometry {
     bevelEnabled: true,
     bevelThickness: 0.02,
     bevelSize: 0.022,
-    bevelSegments: 2,
+    bevelSegments: far ? 1 : 2,
     curveSegments: 1,
   });
   g.rotateX(Math.PI / 2); // extrude downward: the shape's y becomes world z
@@ -60,9 +61,9 @@ function stepGeometry(seed: number): THREE.BufferGeometry {
 }
 
 /** A natural field stone: rounded and lumpy, flatter on the bottom, unit-sized (scaled per stone). */
-function rockGeometry(seed: number): THREE.BufferGeometry {
+function rockGeometry(seed: number, far = false): THREE.BufferGeometry {
   const rng = createRng(seed);
-  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(0.5, 2);
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(0.5, far ? 1 : 2);
   g.deleteAttribute('normal');
   g.deleteAttribute('uv');
   g = mergeVertices(g);
@@ -89,8 +90,8 @@ function rockGeometry(seed: number): THREE.BufferGeometry {
 }
 
 /** A pond-side rock: the same weathered field stone, with soft moss on its upper faces. */
-function shoreGeometry(seed: number): THREE.BufferGeometry {
-  const g = rockGeometry(seed);
+function shoreGeometry(seed: number, far = false): THREE.BufferGeometry {
+  const g = rockGeometry(seed, far);
   const rng = createRng(seed + 5);
   const pos = g.attributes.position;
   const nrm = g.attributes.normal;
@@ -148,6 +149,7 @@ export class Stones {
   readonly group = new THREE.Group();
   /** Each shape's stones, a mesh per patch of ground (so only patches on screen are drawn). */
   private readonly meshes = new Map<StoneKind, Patches[]>();
+  private readonly lodMeshes: THREE.InstancedMesh[] = [];
   private readonly falling: Falling[] = [];
   private readonly sinking: { stone: Placed; t: number }[] = [];
   private readonly grid = new Map<string, Placed[]>();
@@ -171,15 +173,22 @@ export class Stones {
     (Object.keys(SHAPES) as StoneKind[]).forEach((kind) => {
       const list: Patches[] = [];
       for (let k = 0; k < SHAPES[kind]; k++) {
-        const shape = kind === 'shore' ? shoreGeometry(900 + k * 23) : stepGeometry(550 + k * 13); // (the seeds they've always had)
+        // (the seeds they've always had; the far shape is the same stone, simpler)
+        const build = (far: boolean) => (kind === 'shore' ? shoreGeometry(900 + k * 23, far) : stepGeometry(550 + k * 13, far));
+        const shape = build(false);
+        const farShape = build(true);
         list.push(
           new Patches(() => {
             const geo = sharedGeometry(shape);
+            const far = sharedGeometry(farShape);
             mossAttribute(geo, CAPACITY);
+            far.setAttribute('aMossStart', geo.getAttribute('aMossStart')); // the same stones, so the same moss
             const mesh = tintable(new THREE.InstancedMesh(geo, mats[kind], CAPACITY));
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             mesh.frustumCulled = false;
+            mesh.userData.lod = { near: geo, far };
+            this.lodMeshes.push(mesh);
             this.group.add(mesh);
             return mesh;
           }),
@@ -187,6 +196,11 @@ export class Stones {
       }
       this.meshes.set(kind, list);
     });
+  }
+
+  /** Stones far from the camera are drawn with their simpler shape. */
+  updateDetail(camera: THREE.Vector3) {
+    swapDetail(this.lodMeshes, camera, FAR_DETAIL);
   }
 
   private *near(x: number, z: number, r: number): Generator<Placed> {

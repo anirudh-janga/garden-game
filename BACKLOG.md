@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current stories:** Milestone 9 (smooth everywhere): 9.1 and 9.2 are live (👀); 9.3 (real far shapes) is next, then 9.4 and 9.5. **`HANDOFF.md` has the detail and the test tools in `tools/perf/`.** Earlier 👀 stories still wait for review.
+**Current stories:** Milestone 9 (smooth everywhere): 9.1, 9.2 and 9.3 are live (👀); 9.4 (faster undo) is next, then 9.5. **`HANDOFF.md` has the detail and the test tools in `tools/perf/`.** Earlier 👀 stories still wait for review.
 **Preview URL:** https://anirudh-janga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -80,7 +80,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 8.5 Soft light, fewer insects | 👀 Awaiting feedback | No painting style: the garden's original rendering, in soft daylight (bright overcast / window light): the sun turned well down, the sky's broad, whiter light doing most of the work, shading that wraps gently round each form so flower detail shows; nothing blown out. Far fewer insects and drifting specks. Rose detail, red-rose rims and the box-ball fixes stay. |
 | 9.1 No shader hitches | 👀 Awaiting feedback | Shaders are no longer built in the middle of play. Doing everything once from an empty garden (every tool, every weather, every hour, a cottage restyle, waiting for creatures) used to build 32 shaders mid-play; now it builds 1. Causes fixed: the loading-screen warm-up compiled shaders for the wrong target (so each was compiled again on first use; the loading screen now compiles 51 instead of 74); per-item tints arrived with the first stone or post and forced a new shader; restyling the cottage threw its shaders away and rebuilt them; bees, birds, bunnies and ducks brought their shaders when they first arrived. The blocking check on each shader's first use is off in the shipped game. |
 | 9.2 Draw only what's on screen | 👀 Awaiting feedback | Flowers, stones, fences, vines, clover/daisies and pond plants are now kept as a mesh per 20 m patch of ground, so a patch that's off screen isn't drawn at all (before, each kind was one garden-wide mesh that always drew in full). Measured on your garden: zoomed in close it draws **0.69M and 0.99M triangles instead of 1.44M and 1.48M** (about half); zoomed right out nothing can be skipped, and the number of garden meshes goes from 224 to 453, which is exactly what story 9.5 is meant to bring down. Checked: every plant, stone and fence piece is exactly where it was (two gardens); erasing takes away only what's in reach; undo and redo repeatedly give back the same garden; 26,662 on-screen things across 100 views, none in a mesh that gets skipped (no popping at the edges); shaders still compile behind the loading screen. Patch size picked by measuring 10, 20 and 30 m: 10 m skips more (0.47M/0.80M) but has 657 meshes; 30 m has 434 but skips less (0.70M/1.00M). |
-| 9.3 Real far shapes | ⬜ Not started | |
+| 9.3 Real far shapes | 👀 Awaiting feedback | Far-away flowers and stepping stones are now drawn with genuinely lighter shapes of the same plants (fewer petal rows and leaves, 3-sided stems, no thorns, a rose becomes a soft dome, heads with fewer florets; stones with 12 outline points and one bevel step, rocks one subdivision lower), swapped in per mesh beyond 45 m (flowers) / 40 m (stones). Measured on your garden, all flowers drawn far: **0.97M → 0.36M triangles** (37%); fully zoomed out the flowers are 387k triangles and stones 100k (stones were 287k). Near shapes are byte-identical (0 of 443 differ), `worldfp` identical on both gardens, shaders still 1 mid-play; side-by-side pictures at 20, 30, 60 and 100 m look the same. Climbing roses on fences are unchanged. Not measured on a phone. |
 | 9.4 Faster undo | ⬜ Not started | |
 | 9.5 Fewer draw calls | ⬜ Not started | |
 
@@ -778,7 +778,7 @@ Measured on the player's own garden (274 strokes, about 2,900 flower plants): zo
 - Flowers, stones, fences, vines, edge plants and pond plants are skipped when they're off screen (trees and the meadow already are), so a big garden costs what's in view, not what's been built.
 
 ### Story 9.3 — Real far shapes (M)
-- Far away, plants and stones use shapes that are truly lighter (a fraction of the triangles), chosen so the whole garden looks the same from there; checked with before-and-after pictures.
+- (Built.) Far away, plants and stones use shapes that are truly lighter (a fraction of the triangles), chosen so the whole garden looks the same from there; checked with before-and-after pictures.
 
 ### Story 9.4 — Faster undo (L)
 - Undo no longer rebuilds the whole garden: a big garden undoes in a blink.
