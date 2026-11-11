@@ -12,6 +12,8 @@ const CAPACITY = 256; // plants per variant in one patch of ground (a full patch
 const FOLIAGE_VARIANTS = 3;
 /** Beyond this distance (metres) plants are drawn with their simpler, far-off geometry. */
 const FAR_DETAIL = 45;
+/** A 1 m cell of ground as a number (cheaper to look up than a string). */
+const cellKey = (i: number, j: number) => (i + 2048) * 4096 + j + 2048;
 const FOLIAGE_CAPACITY = 512;
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -1377,11 +1379,11 @@ export class Flowers {
   private readonly foliage: Patches[] = [];
   private readonly leaves = new Map<LeafKind, Patches[]>();
   private readonly uniforms = { uFlowerTime: { value: 0 } };
-  private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
+  private readonly grid = new Map<number, { x: number; z: number; r: number }[]>();
   private readonly blooms: Pending[] = [];
   private readonly heads: { pos: THREE.Vector3; openAt: number; species: string; color: THREE.Color }[] = [];
   /** Every plant placed, by 1 m cell, so the eraser can find them. */
-  private readonly placed = new Map<string, Placed[]>();
+  private readonly placed = new Map<number, Placed[]>();
   private readonly wilting: { p: Placed; t: number }[] = [];
   private time = 0;
   private rng = createRng(4242);
@@ -1613,7 +1615,7 @@ export class Flowers {
     }
     const mesh = list[Math.floor(this.rng() * list.length)].at(x, z);
     this.write(mesh, x, y, z, yaw, scale, delay + regrow.offset, 1, color);
-    const key = `${Math.floor(x)},${Math.floor(z)}`;
+    const key = cellKey(Math.floor(x), Math.floor(z));
     if (!this.grid.has(key)) this.grid.set(key, []);
     this.grid.get(key)!.push({ x, z, r: kind === 'grass' || kind === 'hosta' ? 0.32 : kind === 'box' ? 0.26 : 0.22 });
   }
@@ -1633,7 +1635,7 @@ export class Flowers {
     mesh.setMatrixAt(i, this.m);
     mesh.instanceMatrix.addUpdateRange(i * 16, 16);
     mesh.instanceMatrix.needsUpdate = true;
-    const key = `${Math.floor(x)},${Math.floor(z)}`;
+    const key = cellKey(Math.floor(x), Math.floor(z));
     if (!this.placed.has(key)) this.placed.set(key, []);
     this.placed.get(key)!.push({ mesh, index: i, pos: new THREE.Vector3(x, y, z), yaw, scale });
     const g = mesh.geometry;
@@ -1655,7 +1657,7 @@ export class Flowers {
     const cz = Math.floor(z);
     for (let i = cx - 1; i <= cx + 1; i++) {
       for (let j = cz - 1; j <= cz + 1; j++) {
-        for (const p of this.grid.get(`${i},${j}`) ?? []) {
+        for (const p of this.grid.get(cellKey(i, j)) ?? []) {
           const min = Math.min(r, p.r);
           if ((p.x - x) ** 2 + (p.z - z) ** 2 < min * min) return true;
         }
@@ -1670,7 +1672,7 @@ export class Flowers {
     if (!this.write(mesh, x, y, z, yaw, scale, delay, bloomMax, color, edge)) return;
     const birth = this.time + delay;
 
-    const key = `${Math.floor(x)},${Math.floor(z)}`;
+    const key = cellKey(Math.floor(x), Math.floor(z));
     if (!this.grid.has(key)) this.grid.set(key, []);
     this.grid.get(key)!.push({ x, z, r: sp.spacing });
     // (Foliage has no flowers for bees and butterflies to visit.)
@@ -1699,7 +1701,7 @@ export class Flowers {
     const near = (p: { x: number; z: number }) => (p.x - x) ** 2 + (p.z - z) ** 2 < r2;
     for (let i = Math.floor(x - r); i <= Math.floor(x + r); i++) {
       for (let j = Math.floor(z - r); j <= Math.floor(z + r); j++) {
-        const key = `${i},${j}`;
+        const key = cellKey(i, j);
         const list = this.placed.get(key);
         if (list) {
           const keep = list.filter((p) => !near(p.pos));
