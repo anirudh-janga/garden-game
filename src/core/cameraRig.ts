@@ -10,7 +10,10 @@ export class CameraRig {
   readonly target = new THREE.Vector3(0, 0.6, -1.2);
   azimuth = THREE.MathUtils.degToRad(8);
   distance = 40;
+  /** The nearest the ordinary view comes (the camera keeps its usual height to here). */
   minDistance = 9;
+  /** The nearest the camera can go at all: down among the flowers, eye level with a bed. */
+  closeDistance = 1.6;
   maxDistance = 45;
   /** How far the view centre may wander from the middle of the clearing. */
   panLimit = 15;
@@ -22,6 +25,8 @@ export class CameraRig {
   private lastSpan = 0;
   private lastAngle = 0;
   private lastMid = new THREE.Vector2();
+  /** A glide to a place of interest (see `focusOn`): any touch lets go of it. */
+  private glide: { target: THREE.Vector3; distance: number } | null = null;
   /** Set by the toolbar later: when false, one finger is free for building. */
   oneFingerPans = true;
 
@@ -36,12 +41,24 @@ export class CameraRig {
   /** Fits the zoom range to the screen: fully zoomed out shows the whole clearing. */
   fit(fullViewDistance: number) {
     this.maxDistance = fullViewDistance;
-    this.distance = clamp(this.distance, this.minDistance, this.maxDistance);
+    this.distance = clamp(this.distance, this.closeDistance, this.maxDistance);
+  }
+
+  /**
+   * Glide in on a spot (a bed, a flower) to `distance` metres from it. It is still the same
+   * view: pinch out and the camera comes back up to the garden, drag and it follows your finger.
+   */
+  focusOn(target: THREE.Vector3, distance: number) {
+    this.glide = { target: target.clone(), distance: clamp(distance, this.closeDistance, this.maxDistance) };
+    this.velPan.set(0, 0);
+    this.velZoom = 0;
+    this.velRot = 0;
   }
 
   private onDown = (e: PointerEvent) => {
     this.el.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    this.glide = null;
     this.velPan.set(0, 0);
     this.velZoom = 0;
     this.velRot = 0;
@@ -101,11 +118,12 @@ export class CameraRig {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    this.glide = null;
     this.zoomBy(e.deltaY * 0.0015);
   };
 
   private zoomBy(logAmount: number) {
-    this.distance = clamp(this.distance * Math.exp(logAmount), this.minDistance, this.maxDistance);
+    this.distance = clamp(this.distance * Math.exp(logAmount), this.closeDistance, this.maxDistance);
   }
 
   /** Roughly how many metres of ground one screen pixel covers at this zoom. */
@@ -124,11 +142,23 @@ export class CameraRig {
   }
 
   private pitch(): number {
+    // Closer than the ordinary view, the camera sinks toward eye level with the flowers.
+    if (this.distance < this.minDistance) return THREE.MathUtils.degToRad(lerp(15, 34, smoothstep(this.closeDistance, this.minDistance, this.distance)));
     const t = smoothstep(this.minDistance, this.maxDistance, this.distance);
     return THREE.MathUtils.degToRad(lerp(34, 64, t));
   }
 
   update(dt: number) {
+    if (this.glide) {
+      const k = 1 - Math.exp(-dt * 4.5);
+      this.target.lerp(this.glide.target, k);
+      const logD = lerp(Math.log(this.distance), Math.log(this.glide.distance), k);
+      this.distance = Math.exp(logD);
+      if (this.target.distanceTo(this.glide.target) < 0.02 && Math.abs(logD - Math.log(this.glide.distance)) < 0.01) this.glide = null;
+    } else if (this.distance > this.minDistance) {
+      // Back up in the garden, the view centre settles to its usual height again.
+      this.target.y += (0.6 - this.target.y) * (1 - Math.exp(-dt * 3));
+    }
     if (this.pointers.size === 0) {
       // Inertia: keep gliding after the fingers lift, easing to rest.
       const decay = Math.exp(-dt * 5);
