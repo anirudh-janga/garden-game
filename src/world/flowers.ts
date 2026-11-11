@@ -7,7 +7,7 @@ import { FlowerMesh } from './flowerMesh';
 import { Patches, sharedGeometry, swapDetail } from '../render/patches';
 import type { Season } from './season';
 
-const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
+const VARIANTS = 3; // geometry variants per species (plus per-plant scale, yaw, colour)
 const CAPACITY = 256; // plants per variant in one patch of ground (a full patch gets another mesh)
 const FOLIAGE_VARIANTS = 3;
 /** Beyond this distance (metres) plants are drawn with their simpler, far-off geometry. */
