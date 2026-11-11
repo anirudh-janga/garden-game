@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Side of a patch of ground, metres. */
-export const PATCH = 10;
+export const PATCH = 20;
 
 /**
  * One kind of instanced thing (a flower shape, a stepping stone, a picket…), kept as a mesh per
