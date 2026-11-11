@@ -1148,6 +1148,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     view.update(camera, rig.distance);
     gardenBounds.update();
     flowers.updateDetail(camera.position);
+    stones.updateDetail(camera.position);
     const shadows = renderer.shadowMap.needsUpdate;
     for (const c of cullers) {
       if (shadows && c.casts) c.showAll();

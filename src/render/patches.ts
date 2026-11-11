@@ -75,3 +75,21 @@ export function sharedGeometry(base: THREE.BufferGeometry): THREE.BufferGeometry
   g.boundingSphere = base.boundingSphere!.clone();
   return g;
 }
+
+/**
+ * Meshes far from the camera use their simpler geometry (`mesh.userData.lod = { near, far }`):
+ * at that distance the fine shape can't be seen. Decided per mesh, by its nearest instance (so a
+ * mesh with anything up close stays detailed). A little give either way, so a mesh at the
+ * threshold doesn't flicker between the two.
+ */
+export function swapDetail(meshes: Iterable<THREE.InstancedMesh>, camera: THREE.Vector3, farDistance: number) {
+  for (const mesh of meshes) {
+    if (mesh.count === 0) continue;
+    if (!mesh.boundingSphere) mesh.computeBoundingSphere();
+    const b = mesh.boundingSphere!;
+    const d = camera.distanceTo(b.center) - b.radius;
+    const { near, far } = mesh.userData.lod as { near: THREE.BufferGeometry; far: THREE.BufferGeometry };
+    if (mesh.geometry === near && d > farDistance + 2) mesh.geometry = far;
+    else if (mesh.geometry === far && d < farDistance - 2) mesh.geometry = near;
+  }
+}

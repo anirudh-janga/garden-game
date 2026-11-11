@@ -4,7 +4,7 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import { SPECIES, type FlowerSpecies } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
-import { Patches, sharedGeometry } from '../render/patches';
+import { Patches, sharedGeometry, swapDetail } from '../render/patches';
 import type { Season } from './season';
 
 const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
@@ -34,6 +34,8 @@ const isFar = () => detail === 'far';
  * of patio roses was over a million triangles otherwise).
  */
 let denseHeads = false;
+/** A rose bloom made on its own (for fences and walls) keeps its petals even in its light form. */
+let standalone = false;
 const lightPetals = () => isFar() || denseHeads;
 
 /** Builds a plant's geometry twice: in full, and simplified for when it's far away. */
@@ -92,7 +94,9 @@ function stem(m: FlowerMesh, height: number, lean: THREE.Vector3, rng: () => num
     }
   }
   // A few leaves along the stem (a rosette near the ground for short plants).
-  const leaves = !withLeaves ? 0 : height < 0.26 ? 5 : 2 + Math.floor(rng() * 2);
+  let leaves = !withLeaves ? 0 : height < 0.26 ? 5 : 2 + Math.floor(rng() * 2);
+  // (From far off a few leaves stand for them all.)
+  if (isFar()) leaves = Math.min(leaves, height < 0.26 ? 3 : 1);
   for (let i = 0; i < leaves; i++) {
     const az = rng() * Math.PI * 2;
     const y = height < 0.26 ? 0.015 + rng() * 0.03 : lerp(0.06, height * 0.5, rng());
@@ -490,10 +494,12 @@ function hips(m: FlowerMesh, at: THREE.Vector3, size: number, rng: () => number)
 export function climbingRoseGeometry(size: number, opened: number, seed: number): THREE.BufferGeometry {
   const m = new FlowerMesh();
   detail = 'far';
+  standalone = true;
   try {
     roseBloom(m, new THREE.Vector3(), size, 14, opened, false, createRng(seed));
   } finally {
     detail = 'near';
+    standalone = false;
   }
   const g = m.build();
   for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal' && name !== 'color') g.deleteAttribute(name);
@@ -543,16 +549,17 @@ function cane(m: FlowerMesh, pts: THREE.Vector3[], r0: number, rng: () => number
     const dir = b.clone().sub(a).normalize();
     const u = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : UP).normalize();
     const w = new THREE.Vector3().crossVectors(dir, u);
-    for (let k = 0; k < 4; k++) {
-      const a0 = (k / 4) * Math.PI * 2;
-      const a1 = ((k + 1) / 4) * Math.PI * 2;
+    const sides = isFar() ? 3 : 4;
+    for (let k = 0; k < sides; k++) {
+      const a0 = (k / sides) * Math.PI * 2;
+      const a1 = ((k + 1) / sides) * Math.PI * 2;
       const o = (ang: number, r: number) => u.clone().multiplyScalar(Math.cos(ang) * r).addScaledVector(w, Math.sin(ang) * r);
       const n = o((a0 + a1) / 2, 1);
       m.tri(a.clone().add(o(a0, ra)), b.clone().add(o(a1, rb)), b.clone().add(o(a0, rb)), { n, color });
       m.tri(a.clone().add(o(a0, ra)), a.clone().add(o(a1, ra)), b.clone().add(o(a1, rb)), { n, color });
     }
     // Thorns: little red-brown hooks, pointing a touch downward.
-    if (rng() < 0.7) {
+    if (rng() < 0.7 && !isFar()) {
       const ang = rng() * Math.PI * 2;
       const out = u.clone().multiplyScalar(Math.cos(ang)).addScaledVector(w, Math.sin(ang));
       const base = a.clone().lerp(b, rng()).addScaledVector(out, ra * 0.8);
@@ -578,7 +585,7 @@ function roseLeaf(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, len: n
     m.tri(at, mid.clone().addScaledVector(s, tooth), tip, { color: tone, shade: [0.8, 1.05, 1] });
     m.tri(at, tip, mid.clone().addScaledVector(s, -tooth), { color: tone, shade: [0.8, 1, 1.08] });
   };
-  for (let k = 0; k < 2; k++) {
+  for (let k = 0; k < (isFar() ? 1 : 2); k++) {
     const at = base.clone().addScaledVector(dir, len * (0.35 + k * 0.3));
     for (const sgn of [-1, 1]) {
       const d = dir.clone().multiplyScalar(0.45).addScaledVector(side, sgn).add(new THREE.Vector3(0, 0.15, 0)).normalize();
@@ -594,6 +601,12 @@ function roseLeaf(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, len: n
  * has opened, so one bush carries buds, half-open and open roses together.
  */
 function roseBloom(m: FlowerMesh, top: THREE.Vector3, size: number, petals: number, opened: number, wild: boolean, rng: () => number) {
+  if (isFar() && !wild && !standalone) {
+    // From far off a rose is a soft dome of colour (a bud a smaller one): 20 triangles, not 100+.
+    const dome = new THREE.IcosahedronGeometry(size * (opened < 0.2 ? 0.45 : 0.68), 0).scale(1, 0.78, 1).translate(top.x, top.y + size * 0.12, top.z);
+    m.addGeometry(dome, WHITE, true, top);
+    return;
+  }
   sepals(m, top, size * 0.7, rng);
   if (wild) {
     // A simple open five-petalled rose with a boss of golden stamens.
@@ -603,7 +616,7 @@ function roseBloom(m: FlowerMesh, top: THREE.Vector3, size: number, petals: numb
       petal(m, top.clone(), az, lerp(0.5, 1.35, opened), size * lerp(0.92, 1.08, rng()), size * 1.05, 0.12, 0.1, rng, { notch: true });
     }
     m.addGeometry(new THREE.IcosahedronGeometry(size * 0.18, 1).scale(1, 0.5, 1).translate(top.x, top.y + size * 0.05, top.z), new THREE.Color('#d8c050'), false, top);
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < (isFar() ? 0 : 14); i++) {
       const a = (i / 14) * Math.PI * 2;
       const dot = new THREE.IcosahedronGeometry(size * 0.05, 0).translate(top.x + Math.cos(a) * size * 0.26, top.y + size * 0.1, top.z + Math.sin(a) * size * 0.26);
       m.addGeometry(dot, new THREE.Color('#f2c230'), false, top);
@@ -656,7 +669,7 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
     const arch = type === 'climber' ? lerp(0.25, 0.4, rng()) : type === 'wild' ? lerp(0.15, 0.25, rng()) : lerp(0.02, 0.08, rng());
     const h = height * lerp(0.75, 1.05, rng()) * (c === 0 ? 1 : 0.85);
     const pts: THREE.Vector3[] = [];
-    const segs = 6;
+    const segs = isFar() ? 3 : 6;
     for (let i = 0; i <= segs; i++) {
       const t = i / segs;
       const out = arch * Math.sin(t * Math.PI * 0.6) + c * 0.012;
@@ -666,7 +679,7 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
     const winter = plantSeason === 'winter';
     cane(m, pts, type === 'mini' ? 0.0035 : 0.005, rng, winter ? ROSE_CANE_WINTER : ROSE_STEM);
     // Leaves all along (climbers more), each a spray of five; in winter only the odd one hangs on.
-    const leaves = type === 'climber' ? 7 : type === 'mini' ? 3 : 5;
+    const leaves = Math.ceil((type === 'climber' ? 7 : type === 'mini' ? 3 : 5) / (isFar() ? 3 : 1));
     for (let l = 0; l < leaves; l++) {
       if (winter && l > 0) break;
       const t = lerp(0.2, 0.85, (l + rng() * 0.6) / leaves);
@@ -679,14 +692,14 @@ function roseBush(m: FlowerMesh, type: 'tea' | 'floribunda' | 'cabbage' | 'climb
     const tip = pts[segs];
     const blooms: THREE.Vector3[] = [];
     if (type === 'floribunda' || type === 'mini') {
-      const n = type === 'mini' ? 2 + Math.floor(rng() * 2) : 3 + Math.floor(rng() * 3);
+      const n = Math.min(isFar() ? 2 : 9, type === 'mini' ? 2 + Math.floor(rng() * 2) : 3 + Math.floor(rng() * 3));
       for (let b = 0; b < n; b++) {
         const a = (b / n) * Math.PI * 2 + rng();
         const r = b === 0 ? 0 : size * lerp(1.4, 2.0, rng());
         blooms.push(tip.clone().add(new THREE.Vector3(Math.cos(a) * r, -r * 0.4 - (b ? size * 0.3 : 0), Math.sin(a) * r)));
       }
     } else if (type === 'climber' || type === 'wild') {
-      for (const t of [1, 0.78, 0.6]) {
+      for (const t of isFar() ? [1, 0.7] : [1, 0.78, 0.6]) {
         const i = Math.round(t * segs);
         blooms.push(pts[i].clone().add(new THREE.Vector3((rng() - 0.5) * size, size * 0.4, (rng() - 0.5) * size)));
       }
@@ -1206,15 +1219,17 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
           : { ...base, length: base.length * HEAD, width: base.width * HEAD, centerSize: base.centerSize * HEAD, cone: base.cone ? base.cone * HEAD : undefined };
 
   if (f.kind === 'radial') {
-    sepals(m, top, f.length * (f.domed ? 0.45 : 0.35), rng);
+    if (!isFar()) sepals(m, top, f.length * (f.domed ? 0.45 : 0.35), rng);
     // Tilted blooms (pansies) turn their faces outward.
     if (f.tilt) {
       const az = rng() * Math.PI * 2;
       m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(az), 0, Math.sin(az)), f.tilt * lerp(0.85, 1.1, rng())));
     }
-    // (Crowded heads carry fewer petals in the garden, where the inner ones are hidden anyway.)
-    const n = Math.round(lerp(f.petals[0], f.petals[1], rng()) * (denseHeads ? 0.7 : 1));
-    const layers = Math.max(1, f.layers + (f.layers > 1 ? Math.round((rng() - 0.5) * 2) : 0));
+    // (Crowded heads carry fewer petals in the garden, where the inner ones are hidden anyway;
+    // from far off, about half again, each wider to cover the same ground, in two layers at most.)
+    const far = isFar();
+    const n = Math.max(far ? 5 : 0, Math.round(lerp(f.petals[0], f.petals[1], rng()) * (denseHeads ? 0.7 : 1) * (far ? 0.55 : 1)));
+    const layers = Math.min(far ? 2 : 9, Math.max(1, f.layers + (f.layers > 1 ? Math.round((rng() - 0.5) * 2) : 0)));
     const style = { notch: f.notch, pointed: f.pointed, blotch: f.blotch };
     for (let layer = 0; layer < layers; layer++) {
       const k = layers > 1 ? layer / (layers - 1) : 0;
@@ -1232,16 +1247,16 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         const len = f.length * lenK * lerp(0.88, 1.12, rng()) * big;
         const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * ring, lift, Math.sin(az) * ring));
         const cup = f.domed ? lerp(0.05, 0.3, k) : 0;
-        petal(m, hinge, az, open + (rng() - 0.5) * 0.12, len, f.width * lerp(0.88, 1.12, rng()) * (f.domed ? lerp(1, 0.75, k) : 1), cup, 0.12, rng, style);
+        petal(m, hinge, az, open + (rng() - 0.5) * 0.12, len, f.width * lerp(0.88, 1.12, rng()) * (f.domed ? lerp(1, 0.75, k) : 1) * (far ? 1.45 : 1), cup, 0.12, rng, style);
       }
     }
     if (f.cone) {
       // Black-eyed Susan: a dark, raised cone.
-      const cone = new THREE.ConeGeometry(f.centerSize, f.cone, 10, 2);
+      const cone = new THREE.ConeGeometry(f.centerSize, f.cone, far ? 6 : 10, far ? 1 : 2);
       cone.translate(top.x, top.y + f.cone * 0.5, top.z);
       m.addGeometry(cone, new THREE.Color(f.center), false, top);
     } else if (!f.domed) {
-      const centre = new THREE.IcosahedronGeometry(f.centerSize, 1);
+      const centre = new THREE.IcosahedronGeometry(f.centerSize, far ? 0 : 1);
       centre.scale(1, 0.55, 1);
       centre.translate(top.x, top.y + f.centerSize * 0.25, top.z);
       m.addGeometry(centre, new THREE.Color(f.center), false, top);
@@ -1256,8 +1271,9 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     if (f.stamens) {
       // Anemone: a ring of golden stamens round the green centre.
       const c = new THREE.Color(f.stamens);
-      for (let i = 0; i < 16; i++) {
-        const az = (i / 16) * Math.PI * 2;
+      const dots = far ? 5 : 16;
+      for (let i = 0; i < dots; i++) {
+        const az = (i / dots) * Math.PI * 2;
         const dot = new THREE.IcosahedronGeometry(f.centerSize * 0.28, 0);
         dot.translate(top.x + Math.cos(az) * f.centerSize * 1.5, top.y + f.centerSize * 0.4, top.z + Math.sin(az) * f.centerSize * 1.5);
         m.addGeometry(dot, c, false, top);
@@ -1268,11 +1284,13 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     // Sedum and yarrow: a flat-topped head of tiny star florets; hydrangea a rounded mophead;
     // allium a ball of stars held up on its bare stem.
     const shape = f.shape ?? 'flat';
-    for (let i = 0; i < f.florets; i++) {
+    // (From far off, half the florets, each a little bigger and a simpler shape.)
+    const florets = isFar() ? Math.ceil(f.florets * 0.5) : f.florets;
+    for (let i = 0; i < florets; i++) {
       let attach: THREE.Vector3;
       if (shape === 'globe') {
         // Evenly round the sphere (a Fibonacci spiral), with a little jitter.
-        const t = (i + 0.5) / f.florets;
+        const t = (i + 0.5) / florets;
         const phi = Math.acos(1 - 2 * t);
         const th = i * 2.39996 + rng() * 0.3;
         const r = f.radius * lerp(0.92, 1.05, rng());
@@ -1284,7 +1302,8 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         const y = top.y + (1 - (r / f.radius) ** 2) * f.radius * rise + (shape === 'dome' ? f.floretSize * rng() : 0);
         attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
       }
-      const g = new THREE.OctahedronGeometry(f.floretSize * lerp(0.8, 1.2, rng()), 0);
+      const size = f.floretSize * lerp(0.8, 1.2, rng()) * (isFar() ? 1.4 : 1);
+      const g = isFar() ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.OctahedronGeometry(size, 0);
       g.scale(1, 0.5, 1);
       g.translate(attach.x, attach.y, attach.z);
       m.addGeometry(g, WHITE, true, top);
@@ -1379,16 +1398,7 @@ export class Flowers {
    * plant (so a mesh with any plant up close stays detailed).
    */
   updateDetail(camera: THREE.Vector3) {
-    for (const mesh of this.lodMeshes) {
-      if (mesh.count === 0) continue;
-      if (!mesh.boundingSphere) mesh.computeBoundingSphere();
-      const b = mesh.boundingSphere!;
-      const d = camera.distanceTo(b.center) - b.radius;
-      const { near, far } = mesh.userData.lod as { near: THREE.BufferGeometry; far: THREE.BufferGeometry };
-      // A little give either way, so a mesh at the threshold doesn't flicker between the two.
-      if (mesh.geometry === near && d > FAR_DETAIL + 2) mesh.geometry = far;
-      else if (mesh.geometry === far && d < FAR_DETAIL - 2) mesh.geometry = near;
-    }
+    swapDetail(this.lodMeshes, camera, FAR_DETAIL);
   }
 
   constructor(
