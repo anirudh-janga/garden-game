@@ -59,14 +59,28 @@ export class Cottage {
     this.build();
   }
 
+  /**
+   * While set, a change of look only records the style (what the cottage covers, and where its
+   * climbers grow, follow from the style alone): `settle()` builds the walls once, at the end.
+   * An undo replays every restyle in turn, and building each look in between is wasted work.
+   */
+  deferBuild = false;
+  /** The look the walls on screen were built for. */
+  private builtKey = '';
+
   /** Change the cottage's look; it rebuilds and gives a little bounce. */
   setStyle(style: CottageStyle, animate = true) {
-    // The same look again (an undo replaying the garden): nothing to rebuild.
-    const same = this.group.children.length > 0 && encodeStyle(style) === encodeStyle(this.style);
     this.style = { ...style };
-    if (!same) this.build();
+    if (!this.deferBuild) this.settle();
     this.onBuilt();
     if (animate) this.bounce = 0;
+  }
+
+  /** Build the walls for the current style, unless they already are. */
+  settle() {
+    // (The same look again, as when an undo replays the garden: nothing to rebuild.)
+    if (this.group.children.length > 0 && encodeStyle(this.style) === this.builtKey) return;
+    this.build();
   }
 
   /**
@@ -79,6 +93,7 @@ export class Cottage {
 
   private build() {
     this.staleFrames = 0;
+    this.builtKey = encodeStyle(this.style);
     const g = this.group;
     // Clear out the old cottage (it's only ever a few hundred small meshes).
     for (const child of [...g.children]) {

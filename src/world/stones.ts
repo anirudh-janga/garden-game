@@ -12,6 +12,7 @@ const SHAPES: Record<StoneKind, number> = { step: 8, shore: 7 };
 const CAPACITY = 256; // per shape in one patch of ground (a full patch gets another mesh)
 const FAR_DETAIL = 40; // metres from the camera beyond which a stone is drawn simpler
 const CELL = 0.5; // spatial hash cell, metres
+const cellKey = (i: number, j: number) => (i + 2048) * 4096 + j + 2048;
 
 /**
  * A hand-dressed stepping stone: a rounded-square outline (superellipse) whose corners are each
@@ -152,7 +153,7 @@ export class Stones {
   private readonly lodMeshes: THREE.InstancedMesh[] = [];
   private readonly falling: Falling[] = [];
   private readonly sinking: { stone: Placed; t: number }[] = [];
-  private readonly grid = new Map<string, Placed[]>();
+  private readonly grid = new Map<number, Placed[]>();
   private rng = createRng(31);
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -209,7 +210,7 @@ export class Stones {
     const reach = Math.ceil((r + 0.5) / CELL);
     for (let i = cx - reach; i <= cx + reach; i++) {
       for (let j = cz - reach; j <= cz + reach; j++) {
-        const cell = this.grid.get(`${i},${j}`);
+        const cell = this.grid.get(cellKey(i, j));
         if (cell) yield* cell;
       }
     }
@@ -283,7 +284,7 @@ export class Stones {
     mesh.setColorAt(index, tone);
     if (mesh.instanceColor) touch(mesh.instanceColor, index);
     const stone: Placed = { kind, mesh, index, pos: new THREE.Vector3(x, y, z), scale: scale.clone(), yaw, r, owner };
-    const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+    const k = cellKey(Math.floor(x / CELL), Math.floor(z / CELL));
     if (!this.grid.has(k)) this.grid.set(k, []);
     this.grid.get(k)!.push(stone);
     this.falling.push({ stone, delay: delay + regrow.offset, t: 0, landed: false });

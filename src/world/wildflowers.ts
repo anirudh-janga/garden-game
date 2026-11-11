@@ -24,17 +24,35 @@ export class Wildflowers {
     this.target = new Float32Array(this.base.length).fill(1);
   }
 
+  /** Which flowers stand in each 2 m cell of ground (they never move: built when first asked). */
+  private cells: Map<number, number[]> | null = null;
+  private static readonly CELL = 2;
+
   /** Flowers within `r` of (x, z) shrink away into the lawn. */
   clearNear(x: number, z: number, r: number) {
+    const C = Wildflowers.CELL;
+    if (!this.cells) {
+      this.cells = new Map();
+      this.positions.forEach((p, i) => {
+        const k = Math.floor(p.x / C) * 4096 + Math.floor(p.y / C);
+        const list = this.cells!.get(k);
+        if (list) list.push(i);
+        else this.cells!.set(k, [i]);
+      });
+    }
     const r2 = r * r;
-    for (let i = 0; i < this.positions.length; i++) {
-      if (this.target[i] === 0) continue;
-      const dx = this.positions[i].x - x;
-      const dz = this.positions[i].y - z;
-      if (dx * dx + dz * dz < r2) {
-        this.target[i] = 0;
-        this.delay.delete(i);
-        this.shrinking.add(i);
+    for (let a = Math.floor((x - r) / C); a <= Math.floor((x + r) / C); a++) {
+      for (let b = Math.floor((z - r) / C); b <= Math.floor((z + r) / C); b++) {
+        for (const i of this.cells.get(a * 4096 + b) ?? []) {
+          if (this.target[i] === 0) continue;
+          const dx = this.positions[i].x - x;
+          const dz = this.positions[i].y - z;
+          if (dx * dx + dz * dz < r2) {
+            this.target[i] = 0;
+            this.delay.delete(i);
+            this.shrinking.add(i);
+          }
+        }
       }
     }
   }

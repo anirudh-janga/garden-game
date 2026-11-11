@@ -845,8 +845,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     regrow.instant = true;
     ambience.quiet = true;
     for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props, vines]) s.reset();
+    // (Restyles replayed along the way only record the look: the walls are built once, at the end.)
+    cottage.deferBuild = true;
     cottage.setStyle(DEFAULT_STYLE, false);
     for (const a of actions) replayAction(a);
+    cottage.deferBuild = false;
+    cottage.settle();
     // Mown this visit (or kept mown): the wildflowers stay mown through an undo.
     if (mownWild) wildflowers.clearIf(() => true);
     flowers.update(10);

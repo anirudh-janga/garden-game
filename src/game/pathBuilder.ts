@@ -112,9 +112,9 @@ export class PathBuilder {
     const perp = new THREE.Vector2(-this.heading.y, this.heading.x);
     const yaw = Math.atan2(this.heading.x, this.heading.y);
     // Where another path already runs, its stones carry on there.
-    const insideOther = this.distanceTo(w.x, w.y, true, 2) < 0.55;
+    // (Asked only when a stone is due: it's a search of the neighbouring cells.)
     this.sinceStone += first ? 0 : STEP;
-    if ((first || this.sinceStone >= STRIDE) && !insideOther) {
+    if ((first || this.sinceStone >= STRIDE) && !(this.distanceTo(w.x, w.y, true, 2) < 0.55)) {
       this.sinceStone = 0;
       // Staggered left and right, like footsteps, each a touch different.
       const side = this.stride++ % 2 === 0 ? -1 : 1;
