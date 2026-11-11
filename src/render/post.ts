@@ -114,11 +114,12 @@ void main() {
 
 const LEVELS = 3; // bloom chain: 1/4, 1/8, 1/16 of full resolution
 
-function target(w: number, h: number, samples = 0) {
+/** (The scene's own target always needs a depth buffer, whatever its antialiasing: without one, nearer things don't hide what's behind them.) */
+function target(w: number, h: number, samples = 0, depth = false) {
   return new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
     type: THREE.HalfFloatType,
     samples,
-    depthBuffer: samples > 0,
+    depthBuffer: depth,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
   });
@@ -158,7 +159,7 @@ export class PostFX {
     private readonly scene: THREE.Scene,
     private readonly camera: THREE.Camera,
   ) {
-    this.sceneRT = target(1, 1, this.samples);
+    this.sceneRT = target(1, 1, this.samples, true);
     for (let i = 0; i < LEVELS; i++) {
       this.bloomRTs.push(target(1, 1));
       this.upRTs.push(target(1, 1));
@@ -189,7 +190,7 @@ export class PostFX {
     this.samples = samples;
     const { width, height } = this.sceneRT;
     this.sceneRT.dispose();
-    this.sceneRT = target(width, height, samples);
+    this.sceneRT = target(width, height, samples, true);
   }
 
   /** The colour grade (lift/gain/saturation) and bloom strength, e.g. for the time of day. */
