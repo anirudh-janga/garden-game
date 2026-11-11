@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 npx tsc --noEmit
 npm run build 2>&1 | grep -q "built in"
 git config user.name "Anirudh"; git config user.email "7342625+anirudh-janga@users.noreply.github.com"
-git add -A src BACKLOG.md HANDOFF.md tools public index.html vite.config.ts 2>/dev/null || true
+git add -A src BACKLOG.md tools public index.html vite.config.ts 2>/dev/null || true
 {
   printf '%s\n\n%s\n\n' "$1" "$2"
   printf 'Co-Authored-By: %s\n' "$COAUTHOR"
