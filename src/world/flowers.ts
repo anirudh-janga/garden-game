@@ -1694,6 +1694,41 @@ export class Flowers {
     this.rng = createRng(4242);
   }
 
+  /** Where the plants within `r` of (x, z) stand (every kind, foliage too). */
+  plantsNear(x: number, z: number, r: number): THREE.Vector3[] {
+    const out: THREE.Vector3[] = [];
+    for (let i = Math.floor(x - r); i <= Math.floor(x + r); i++) {
+      for (let j = Math.floor(z - r); j <= Math.floor(z + r); j++) {
+        for (const p of this.placed.get(cellKey(i, j)) ?? []) if ((p.pos.x - x) ** 2 + (p.pos.z - z) ** 2 < r * r) out.push(p.pos);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * The plant a touch landed on: the one nearest the ray (within `tolerance` metres of it, taking
+   * a plant to be about knee high), or null.
+   */
+  pick(ray: THREE.Ray, tolerance: number): THREE.Vector3 | null {
+    const t = (0.3 - ray.origin.y) / ray.direction.y;
+    if (!(t > 0)) return null;
+    const hx = ray.origin.x + ray.direction.x * t;
+    const hz = ray.origin.z + ray.direction.z * t;
+    let best: THREE.Vector3 | null = null;
+    let bestD = tolerance;
+    const v = new THREE.Vector3();
+    const reach = 2 + tolerance;
+    for (const p of this.plantsNear(hx, hz, reach)) {
+      v.set(p.x, p.y + 0.3, p.z);
+      const d = ray.distanceToPoint(v);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
   /** Plants within `r` of (x, z) wilt and sink back into the soil. Returns how many. */
   erase(x: number, z: number, r: number): number {
     let n = 0;

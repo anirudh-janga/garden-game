@@ -235,7 +235,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   scene.add(motes);
 
   // --- Camera: a diorama you hold in your hand ----------------------------------------------
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 400);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.3, 400);
   const rig = new CameraRig(camera, surface as unknown as HTMLElement);
 
   /** Distance at which the whole clearing fits the screen (the zoomed-out view). */
@@ -826,7 +826,43 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       ray.setFromCamera(new THREE.Vector2((e.clientX / screen.width) * 2 - 1, -(e.clientY / screen.height) * 2 + 1), camera);
       const onCottage = ray.intersectObject(cottage.group, true).length > 0;
       link.call('cottageTap', onCottage);
+      // With the Look-around tool, a tap on a bed or a flower takes the camera in close on it.
+      if (!onCottage && rig.oneFingerPans) focusOnBed(ray.ray);
     });
+  }
+  /**
+   * Glide in on the bed (or the single flower) a tap landed on, as close as the plants allow: the
+   * garden's own shapes, the same view, so pinching out brings you back. Nothing happens off a bed.
+   */
+  function focusOnBed(ray: THREE.Ray) {
+    const picked = flowers.pick(ray, Math.max(0.25, rig.metresPerPixel * 28));
+    let x: number;
+    let z: number;
+    if (picked) {
+      x = picked.x;
+      z = picked.z;
+    } else {
+      // An empty bit of a bed: where the touch met the ground.
+      const t = (0.1 - ray.origin.y) / ray.direction.y;
+      if (!(t > 0)) return;
+      x = ray.origin.x + ray.direction.x * t;
+      z = ray.origin.z + ray.direction.z * t;
+      if (flowerBrush.distanceToBeds(x, z) > -0.1) return;
+    }
+    // The plants around the touch (a bed can be long: the stretch you touched, not all of it).
+    const near = flowers.plantsNear(x, z, 1.5);
+    if (near.length === 0) return;
+    let cx = 0;
+    let cz = 0;
+    for (const p of near) {
+      cx += p.x;
+      cz += p.z;
+    }
+    cx /= near.length;
+    cz /= near.length;
+    let extent = 0;
+    for (const p of near) extent = Math.max(extent, Math.hypot(p.x - cx, p.z - cz));
+    rig.focusOn(new THREE.Vector3(cx, ground.heightAt(cx, cz) + 0.4, cz), extent * 2.3 + 1.8);
   }
   const setCottageStyle = (style: CottageStyle) => {
     cottage.setStyle(style);
