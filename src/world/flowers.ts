@@ -4,14 +4,15 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import { SPECIES, type FlowerSpecies } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
+import { Patches, sharedGeometry } from '../render/patches';
 import type { Season } from './season';
 
 const VARIANTS = 5; // geometry variants per species (plus per-plant scale, yaw, colour)
-const CAPACITY = 1500; // plants per variant
+const CAPACITY = 256; // plants per variant in one patch of ground (a full patch gets another mesh)
 const FOLIAGE_VARIANTS = 3;
 /** Beyond this distance (metres) plants are drawn with their simpler, far-off geometry. */
 const FAR_DETAIL = 45;
-const FOLIAGE_CAPACITY = 4000;
+const FOLIAGE_CAPACITY = 512;
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** Growth timeline (seconds after a plant's birth): sprout → bud → bloom. */
@@ -1352,9 +1353,10 @@ interface Placed {
 
 export class Flowers {
   readonly group = new THREE.Group();
-  private readonly meshes = new Map<string, THREE.InstancedMesh[]>();
-  private readonly foliage: THREE.InstancedMesh[] = [];
-  private readonly leaves = new Map<LeafKind, THREE.InstancedMesh[]>();
+  /** Each shape's plants, a mesh per patch of ground (so only patches on screen are drawn). */
+  private readonly meshes = new Map<string, Patches[]>();
+  private readonly foliage: Patches[] = [];
+  private readonly leaves = new Map<LeafKind, Patches[]>();
   private readonly uniforms = { uFlowerTime: { value: 0 } };
   private readonly grid = new Map<string, { x: number; z: number; r: number }[]>();
   private readonly blooms: Pending[] = [];
@@ -1397,7 +1399,7 @@ export class Flowers {
     // Water flowers float: the same material, but they ride the ripples.
     this.waterMaterial = this.makeMaterial(true);
     for (let v = 0; v < FOLIAGE_VARIANTS; v++) {
-      this.foliage.push(this.makeMesh(withFar(() => foliageGeometry(500 + v * 31)), this.material, FOLIAGE_CAPACITY));
+      this.foliage.push(this.patches(withFar(() => foliageGeometry(500 + v * 31)), this.material, FOLIAGE_CAPACITY));
     }
   }
 
@@ -1517,20 +1519,26 @@ export class Flowers {
    * A species' meshes, made the first time it's planted (with 50+ species, building them all up
    * front would hold tens of megabytes of empty instance buffers on the phone).
    */
-  private variants(sp: FlowerSpecies): THREE.InstancedMesh[] {
+  private variants(sp: FlowerSpecies): Patches[] {
     let list = this.meshes.get(sp.id);
     if (!list) {
       list = [];
       const material = sp.form.kind === 'aquatic' ? this.waterMaterial : this.material;
       for (let v = 0; v < VARIANTS; v++) {
-        const mesh = this.makeMesh(this.shape({ kind: 'flower', species: sp.id, variant: v }), material, CAPACITY);
-        mesh.userData.species = sp.id;
-        mesh.userData.variant = v;
-        list.push(mesh);
+        list.push(this.patches(this.shape({ kind: 'flower', species: sp.id, variant: v }), material, CAPACITY, { species: sp.id, variant: v }));
       }
       this.meshes.set(sp.id, list);
     }
     return list;
+  }
+
+  /** One shape's meshes: made as its patches are planted, all sharing the shape's vertices. */
+  private patches(shape: [THREE.BufferGeometry, THREE.BufferGeometry], material: THREE.Material, capacity: number, tag?: { species: string; variant: number }): Patches {
+    return new Patches(() => {
+      const mesh = this.makeMesh([sharedGeometry(shape[0]), sharedGeometry(shape[1])], material, capacity);
+      if (tag) Object.assign(mesh.userData, tag);
+      return mesh;
+    });
   }
 
   /** Shapes built ahead of time (in a worker), waiting to be used. */
@@ -1590,15 +1598,10 @@ export class Flowers {
     if (kind === 'clump') return this.plantFoliage(x, y, z, yaw, scale, delay, color);
     let list = this.leaves.get(kind);
     if (!list) {
-      list = [0, 1, 2].map((variant) => {
-        const mesh = this.makeMesh(this.shape({ kind: 'leaf', leaf: kind, variant }), this.material, 1500);
-        mesh.userData.species = `leaf:${kind}`;
-        mesh.userData.variant = variant;
-        return mesh;
-      });
+      list = [0, 1, 2].map((variant) => this.patches(this.shape({ kind: 'leaf', leaf: kind, variant }), this.material, CAPACITY, { species: `leaf:${kind}`, variant }));
       this.leaves.set(kind, list);
     }
-    const mesh = list[Math.floor(this.rng() * list.length)];
+    const mesh = list[Math.floor(this.rng() * list.length)].at(x, z);
     this.write(mesh, x, y, z, yaw, scale, delay + regrow.offset, 1, color);
     const key = `${Math.floor(x)},${Math.floor(z)}`;
     if (!this.grid.has(key)) this.grid.set(key, []);
@@ -1607,7 +1610,7 @@ export class Flowers {
 
   /** A leafy clump that fills the bed around the flowers. It swells in alongside them. */
   plantFoliage(x: number, y: number, z: number, yaw: number, scale: number, delay: number, color: THREE.Color) {
-    const mesh = this.foliage[Math.floor(this.rng() * this.foliage.length)];
+    const mesh = this.foliage[Math.floor(this.rng() * this.foliage.length)].at(x, z);
     this.write(mesh, x, y, z, yaw, scale, delay + regrow.offset, 1, color);
   }
 
@@ -1653,7 +1656,7 @@ export class Flowers {
 
   plant(sp: FlowerSpecies, variant: number, x: number, y: number, z: number, yaw: number, scale: number, delay: number, bloomMax: number, color: THREE.Color, edge?: THREE.Color) {
     delay += regrow.offset;
-    const mesh = this.variants(sp)[variant % VARIANTS];
+    const mesh = this.variants(sp)[variant % VARIANTS].at(x, z);
     if (!this.write(mesh, x, y, z, yaw, scale, delay, bloomMax, color, edge)) return;
     const birth = this.time + delay;
 
@@ -1670,10 +1673,7 @@ export class Flowers {
 
   /** Back to an untouched garden (before an undo replays what remains). */
   reset() {
-    for (const m of [...[...this.meshes.values()].flat(), ...this.foliage, ...[...this.leaves.values()].flat()]) {
-      m.count = 0;
-      m.visible = false;
-    }
+    for (const p of [...[...this.meshes.values()].flat(), ...this.foliage, ...[...this.leaves.values()].flat()]) p.reset();
     this.grid.clear();
     this.blooms.length = 0;
     this.heads.length = 0;
