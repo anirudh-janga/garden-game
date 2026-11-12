@@ -7,6 +7,7 @@ import { EAST_ASIA } from './species/eastAsia';
 import { SOUTH_ASIA } from './species/southAsia';
 import { MEXICO } from './species/mexico';
 import { SOUTH_AMERICA } from './species/southAmerica';
+import { NORTH_AMERICA } from './species/northAmerica';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
@@ -56,6 +57,8 @@ export interface RadialForm {
   leaves?: LeafHabit;
   /** A ring of fine filaments round the centre, in a second colour (a passion flower's corona). */
   fringe?: { color: string; count: number };
+  /** Long curved spurs behind the petals (a columbine). */
+  spurs?: boolean;
 }
 
 export type FlowerForm =
@@ -959,7 +962,7 @@ export const SPECIES: FlowerSpecies[] = BASE.map((sp) => {
   const o = ORIGINS[sp.id];
   if (!o && !(sp.region && sp.latin && sp.native)) throw new Error(`No origin for ${sp.id}`);
   return { ...sp, region: sp.region ?? o[0], latin: sp.latin ?? o[1], native: sp.native ?? o[2] } as FlowerSpecies;
-}).concat(AFRICA, OCEANIA, EAST_ASIA, SOUTH_ASIA, MEXICO, SOUTH_AMERICA);
+}).concat(AFRICA, OCEANIA, EAST_ASIA, SOUTH_ASIA, MEXICO, SOUTH_AMERICA, NORTH_AMERICA);
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';
