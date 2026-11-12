@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { regrow } from '../core/regrow';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
-import type { FlowerSpecies, LeafHabit } from './flowerSpecies';
+import type { AquaticType, FlowerSpecies, LeafHabit } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
 import { exoticGeometry, leafHabit, type Helpers } from './exotic';
 import { Patches, sharedGeometry, swapDetail } from '../render/patches';
@@ -822,7 +822,7 @@ function simpleBloom(m: FlowerMesh, top: THREE.Vector3, n: number, len: number, 
 const WATER_BRONZE = new THREE.Color('#9a6a32');
 const WATER_WINTER = new THREE.Color('#3c4630');
 
-function aquatic(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, size: number, rng: () => number): THREE.Vector3 {
+function aquatic(m: FlowerMesh, type: AquaticType, height: number, size: number, rng: () => number): THREE.Vector3 {
   const top = plantSeason === 'winter' ? aquaticWinter(m, type, height, rng) : aquaticGrowing(m, type, height, size, rng);
   if (plantSeason === 'autumn') m.tintLeaves(WATER_BRONZE, 0.6);
   if (plantSeason === 'winter') m.tintLeaves(WATER_WINTER, 0.65, 0.85);
@@ -830,7 +830,7 @@ function aquatic(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | '
 }
 
 /** Winter: only a few dark pads on the water, or a few spent leaves standing at the edge. */
-function aquaticWinter(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, rng: () => number): THREE.Vector3 {
+function aquaticWinter(m: FlowerMesh, type: AquaticType, height: number, rng: () => number): THREE.Vector3 {
   const O = new THREE.Vector3(0, 0, 0);
   if (type === 'lily' || type === 'lotus' || type === 'hyacinth') {
     const n = 1 + Math.floor(rng() * 2);
@@ -849,7 +849,7 @@ function aquaticWinter(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'fla
   return new THREE.Vector3(0, height * 0.35, 0);
 }
 
-function aquaticGrowing(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead', height: number, size: number, rng: () => number): THREE.Vector3 {
+function aquaticGrowing(m: FlowerMesh, type: AquaticType, height: number, size: number, rng: () => number): THREE.Vector3 {
   const O = new THREE.Vector3(0, 0, 0);
   switch (type) {
     case 'lily': {
@@ -862,6 +862,18 @@ function aquaticGrowing(m: FlowerMesh, type: 'lotus' | 'lily' | 'hyacinth' | 'fl
       const top = new THREE.Vector3(0.03, 0.032, 0.02);
       simpleBloom(m, top, 9, size, size * 0.42, 1.05, 0.05, new THREE.Color('#f2c230'), rng, { pointed: true });
       simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.006, 0)), 8, size * 0.8, size * 0.38, 0.65, 0.12, null, rng, { pointed: true });
+      return top;
+    }
+    case 'starlily': {
+      // A star-shaped water lily held a hand above the water on a short stalk, among small round pads.
+      for (let i = 0; i < 3; i++) {
+        const a = i * 2.1 + rng();
+        pad(m, Math.cos(a) * lerp(0.1, 0.18, rng()), Math.sin(a) * lerp(0.1, 0.18, rng()), lerp(0.07, 0.1, rng()), 0.016, true, 0, rng);
+      }
+      const top = new THREE.Vector3(0.02, 0.1, 0.02);
+      strip(m, new THREE.Vector3(0.02, 0.0, 0.02), top, 0.004);
+      simpleBloom(m, top, 12, size, size * 0.3, 0.95, 0.08, new THREE.Color('#f2c230'), rng, { pointed: true });
+      if (!isFar()) simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.008, 0)), 9, size * 0.75, size * 0.28, 0.55, 0.12, null, rng, { pointed: true });
       return top;
     }
     case 'lotus': {
@@ -1218,7 +1230,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     geo.userData.headY = 0;
     return geo;
   }
-  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane') return exoticGeometry(sp, m, height, rng, helpers());
+  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane' || sp.form.kind === 'fan' || sp.form.kind === 'spider') return exoticGeometry(sp, m, height, rng, helpers());
   if (sp.form.kind === 'arch') {
     const geo = archPlant(m, sp.form, height, rng);
     return geo;

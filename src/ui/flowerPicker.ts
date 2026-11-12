@@ -121,26 +121,10 @@ export function icon(sp: FlowerSpecies | null, water = false): string {
               : `<circle cx="20" cy="22" r="11" fill="${fill}"/><circle cx="16" cy="18" r="4" fill="rgba(255,255,255,.12)"/>`;
     return `<svg viewBox="0 0 40 40" aria-hidden="true">${art}</svg>`;
   }
-  if (f.kind === 'bracts') {
-    // Pointed bracts round a centre.
-    const n = f.style === 'cone' ? 9 : Math.min(14, f.per);
-    const spread = f.style === 'cone' ? 60 : 150;
-    const bracts = Array.from({ length: n }, (_, i) => `<ellipse cx="20" cy="${f.style === 'cone' ? 14 : 20}" rx="2.2" ry="${f.style === 'star' ? 8 : 6.5}" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".5" transform="rotate(${-spread / 2 + (i / Math.max(1, n - 1)) * spread} 20 ${f.style === 'cone' ? 22 : 14})"/>`).join('');
-    return svg(`${bracts}<circle cx="20" cy="14" r="${f.style === 'cone' ? 3 : 4.4}" fill="${f.centre.color ?? c}"/>`);
-  }
-  if (f.kind === 'spathe') {
-    if (f.style === 'funnel') return svg(`<path d="M14 6c1 10 4 16 6 16s5-6 6-16c-4 2-8 2-12 0z" fill="${c}" stroke="rgba(0,0,0,.22)" stroke-width=".8"/><rect x="19" y="6" width="2.4" height="12" rx="1.2" fill="${f.spadix}"/>`);
-    if (f.style === 'flat') return svg(`<path d="M20 25c-9-6-12-10-9-14 3-3 7-2 9 2 2-4 6-5 9-2 3 4 0 8-9 14z" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".8"/><path d="M21 15c2-5 4-8 6-9" stroke="${f.spadix}" stroke-width="2.4" stroke-linecap="round" fill="none"/>`);
-    return svg(`<path d="M13 22c0-9 5-15 12-15-3 3-3 8-1 15z" fill="${c}" stroke="rgba(0,0,0,.25)" stroke-width=".8"/><path d="M18 22c0-5 1-9 3-12" stroke="${f.spadix}" stroke-width="2" stroke-linecap="round" fill="none"/>`);
-  }
-  if (f.kind === 'crane') {
-    if (f.style === 'bird') return svg(`${[-40, -15, 10].map((r) => `<ellipse cx="20" cy="12" rx="1.9" ry="7" fill="${c}" transform="rotate(${r} 20 18)"/>`).join('')}<ellipse cx="22" cy="19" rx="8" ry="2.4" fill="#5f8a3a" transform="rotate(-12 22 19)"/><ellipse cx="27" cy="14" rx="1.4" ry="5" fill="#2f5fb0" transform="rotate(50 27 14)"/>`);
-    return svg(`${[0, 1, 2, 3].map((i) => `<ellipse cx="${20 + (i % 2 ? 5 : -5)}" cy="${28 - i * 6.5}" rx="6.5" ry="2.8" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".6" transform="rotate(${i % 2 ? -18 : 18} ${20 + (i % 2 ? 5 : -5)} ${28 - i * 6.5})"/>`).join('')}`);
-  }
-  if (f.kind === 'bush') {
-    // A leafy mound with blooms on top.
-    return `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="27" rx="14" ry="9" fill="#5f8a3e"/><ellipse cx="14" cy="24" rx="7" ry="5" fill="#6fa048"/>${[[12, 20], [21, 16], [28, 22], [18, 25]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4.4" fill="${c}"/><circle cx="${x}" cy="${y}" r="1.4" fill="#f6d36a"/>`).join('')}</svg>`;
-  }
+  const newer = exoticIcon(sp, c, svg);
+  if (newer) return newer;
+  // (Anything else that isn't a ring of petals gets a plain bloom.)
+  if (f.kind !== 'radial') return svg(bloom(20, 15, c, 8, 6));
   if (f.domed) {
     // Pom-pom: rings of petals building up to a crown.
     return svg(`${bloom(20, 15, c, 12, 5, c)}${bloom(20, 14, c, 9, 4, c, 3.6)}<circle cx="20" cy="13.5" r="3.4" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".6"/>`);
@@ -189,6 +173,42 @@ const AMOUNT_ICONS: Record<'drift' | 'clump' | 'one', [string, string]> = {
   // A single flower on its stem.
   one: [`<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 33V19" stroke="#5f8a3e" stroke-width="2.2" stroke-linecap="round"/><path d="M20 27c-4-1-6-4-6-6 3 0 5 2 6 6z" fill="#6aa548"/>${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="20" cy="11" rx="3.2" ry="5" fill="#e88aa8" transform="rotate(${a} 20 16)"/>`).join('')}<circle cx="20" cy="16" r="2.8" fill="#f6d36a"/></svg>`, 'One'],
 };
+
+/** Pictures for the newer shape kinds (bracts, spathe, crane, bush, fan, spider…): null for any other. */
+function exoticIcon(sp: FlowerSpecies, c: string, svg: (inner: string) => string): string | null {
+  const f = sp.form;
+  if (f.kind === 'bracts') {
+    // Pointed bracts round a centre.
+    const n = f.style === 'cone' ? 9 : Math.min(14, f.per);
+    const spread = f.style === 'cone' ? 60 : 150;
+    const bracts = Array.from({ length: n }, (_, i) => `<ellipse cx="20" cy="${f.style === 'cone' ? 14 : 20}" rx="2.2" ry="${f.style === 'star' ? 8 : 6.5}" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".5" transform="rotate(${-spread / 2 + (i / Math.max(1, n - 1)) * spread} 20 ${f.style === 'cone' ? 22 : 14})"/>`).join('');
+    return svg(`${bracts}<circle cx="20" cy="14" r="${f.style === 'cone' ? 3 : 4.4}" fill="${f.centre.color ?? c}"/>`);
+  }
+  if (f.kind === 'spathe') {
+    if (f.style === 'funnel') return svg(`<path d="M14 6c1 10 4 16 6 16s5-6 6-16c-4 2-8 2-12 0z" fill="${c}" stroke="rgba(0,0,0,.22)" stroke-width=".8"/><rect x="19" y="6" width="2.4" height="12" rx="1.2" fill="${f.spadix}"/>`);
+    if (f.style === 'flat') return svg(`<path d="M20 25c-9-6-12-10-9-14 3-3 7-2 9 2 2-4 6-5 9-2 3 4 0 8-9 14z" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".8"/><path d="M21 15c2-5 4-8 6-9" stroke="${f.spadix}" stroke-width="2.4" stroke-linecap="round" fill="none"/>`);
+    return svg(`<path d="M13 22c0-9 5-15 12-15-3 3-3 8-1 15z" fill="${c}" stroke="rgba(0,0,0,.25)" stroke-width=".8"/><path d="M18 22c0-5 1-9 3-12" stroke="${f.spadix}" stroke-width="2" stroke-linecap="round" fill="none"/>`);
+  }
+  if (f.kind === 'crane') {
+    if (f.style === 'bird') return svg(`${[-40, -15, 10].map((r) => `<ellipse cx="20" cy="12" rx="1.9" ry="7" fill="${c}" transform="rotate(${r} 20 18)"/>`).join('')}<ellipse cx="22" cy="19" rx="8" ry="2.4" fill="#5f8a3a" transform="rotate(-12 22 19)"/><ellipse cx="27" cy="14" rx="1.4" ry="5" fill="#2f5fb0" transform="rotate(50 27 14)"/>`);
+    return svg(`${[0, 1, 2, 3].map((i) => `<ellipse cx="${20 + (i % 2 ? 5 : -5)}" cy="${28 - i * 6.5}" rx="6.5" ry="2.8" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".6" transform="rotate(${i % 2 ? -18 : 18} ${20 + (i % 2 ? 5 : -5)} ${28 - i * 6.5})"/>`).join('')}`);
+  }
+  if (f.kind === 'bush') {
+    // A leafy mound with blooms on top.
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="27" rx="14" ry="9" fill="#5f8a3e"/><ellipse cx="14" cy="24" rx="7" ry="5" fill="#6fa048"/>${[[12, 20], [21, 16], [28, 22], [18, 25]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4.4" fill="${c}"/><circle cx="${x}" cy="${y}" r="1.4" fill="#f6d36a"/>`).join('')}</svg>`;
+  }
+  if (f.kind === 'fan') {
+    // An arching stem with a row of tubes along its top.
+    const tubes = Array.from({ length: 6 }, (_, i) => `<ellipse cx="${13 + i * 4}" cy="${16 - Math.sin(i / 5 * 2.2) * 6 + 4}" rx="2.1" ry="${4.2 - i * 0.3}" fill="${c}" stroke="rgba(0,0,0,.18)" stroke-width=".5" transform="rotate(${-25 + i * 6} ${13 + i * 4} ${16 - Math.sin(i / 5 * 2.2) * 6 + 4})"/>`).join('');
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 37C10 22 14 14 32 14" stroke="#5f8f3e" stroke-width="1.8" fill="none" stroke-linecap="round"/>${tubes}</svg>`;
+  }
+  if (f.kind === 'spider') {
+    // Curled petals round long stamens.
+    const petals = Array.from({ length: 6 }, (_, i) => `<path d="M20 17c${Math.cos(i * 1.05) * 6} ${Math.sin(i * 1.05) * 5 - 3} ${Math.cos(i * 1.05) * 11} ${Math.sin(i * 1.05) * 8 - 2} ${Math.cos(i * 1.05) * 13} ${Math.sin(i * 1.05) * 10 + 2}" stroke="${c}" stroke-width="2.6" stroke-linecap="round" fill="none"/>`).join('');
+    return svg(`${petals}<circle cx="20" cy="16" r="2" fill="${f.stamens}"/>`);
+  }
+  return null;
+}
 
 const LEAF_BOOK_ICON = `<svg viewBox="0 0 40 40" aria-hidden="true">
   <path d="M6 10c5-2 10-2 14 1v21c-4-3-9-3-14-1z" fill="#c9d9a8" stroke="#5f7f43" stroke-width="1.2"/>
