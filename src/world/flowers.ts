@@ -1253,7 +1253,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     geo.userData.headY = 0;
     return geo;
   }
-  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane' || sp.form.kind === 'fan' || sp.form.kind === 'spider' || sp.form.kind === 'brush' || sp.form.kind === 'orchid' || sp.form.kind === 'trumpet') return exoticGeometry(sp, m, height, rng, helpers());
+  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane' || sp.form.kind === 'fan' || sp.form.kind === 'spider' || sp.form.kind === 'brush' || sp.form.kind === 'orchid' || sp.form.kind === 'trumpet' || sp.form.kind === 'crown') return exoticGeometry(sp, m, height, rng, helpers());
   if (sp.form.kind === 'arch') {
     const geo = archPlant(m, sp.form, height, rng);
     return geo;

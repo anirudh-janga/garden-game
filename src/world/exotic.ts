@@ -523,6 +523,38 @@ function trumpet(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpe
   return top.clone().add(V(0, L * 0.5, 0));
 }
 
+/** A crown imperial: a tall bare stem, a ring of hanging bells, and a tuft of leaves standing on top like a crown. */
+function crown(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpecies['form'], { kind: 'crown' }>, rng: () => number): THREE.Vector3 {
+  const far = H.isFar();
+  const lean = V((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.04);
+  const top = H.stem(m, height, lean, rng, false);
+  const s = f.size * H.HEAD;
+  const n = far ? Math.min(f.bells, 4) : f.bells;
+  const off = rng() * 6;
+  for (let i = 0; i < n; i++) {
+    const az = off + (i / n) * Math.PI * 2;
+    const out = V(Math.cos(az), 0, Math.sin(az));
+    const at = top.clone().addScaledVector(out, s * 0.9).add(V(0, -s * 0.2, 0));
+    if (!far) H.strip(m, top, at, 0.0025);
+    // A bell hangs open end down, a little flared.
+    const bell = new THREE.CylinderGeometry(s * 0.2, s * 0.55, s * 1.5, far ? 4 : 7, 1, true).translate(at.x, at.y - s * 0.8, at.z);
+    m.addGeometry(bell, H.WHITE, true, at, 0.3);
+  }
+  // The crown of leaves above the bells.
+  const tuft = far ? 4 : 8;
+  for (let i = 0; i < tuft; i++) {
+    const az = (i / tuft) * Math.PI * 2 + rng();
+    const d = V(Math.cos(az), 0, Math.sin(az));
+    const sd = V(-d.z, 0, d.x);
+    const base = top.clone().add(V(0, s * 0.15, 0));
+    const tip = base.clone().addScaledVector(d, s * 0.7).add(V(0, s * 1.3, 0));
+    const mid = base.clone().addScaledVector(d, s * 0.25).add(V(0, s * 0.6, 0));
+    m.tri(base, mid.clone().addScaledVector(sd, s * 0.12), tip, { color: H.LEAF, shade: [0.8, 1, 1.05] });
+    m.tri(base, tip, mid.clone().addScaledVector(sd, -s * 0.12), { color: H.LEAF, shade: [0.8, 1.05, 1] });
+  }
+  return top;
+}
+
 /** Builds the shapes of the newer kinds (bracts, spathe, crane, bush, fan, spider, brush, orchid, trumpet). Returns the geometry, with `headY` set. */
 export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number, rng: () => number, H: Helpers): THREE.BufferGeometry {
   const f = sp.form;
@@ -534,6 +566,9 @@ export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number,
   } else if (f.kind === 'fan') {
     headY = fan(m, H, height, f, rng).y;
     leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);
+  } else if (f.kind === 'crown') {
+    headY = crown(m, H, height, f, rng).y;
+    leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.3), rng);
   } else if (f.kind === 'trumpet') {
     headY = trumpet(m, H, height, f, rng).y;
     leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.4), rng);

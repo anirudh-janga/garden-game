@@ -8,6 +8,7 @@ import { SOUTH_ASIA } from './species/southAsia';
 import { MEXICO } from './species/mexico';
 import { SOUTH_AMERICA } from './species/southAmerica';
 import { NORTH_AMERICA } from './species/northAmerica';
+import { MEDITERRANEAN } from './species/mediterranean';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
@@ -116,6 +117,8 @@ export type FlowerForm =
   | { kind: 'orchid'; type: 'moth' | 'cattleya' | 'star' | 'slipper'; flowers: number; size: number; lip: string; leaves?: LeafHabit }
   /** One flaring funnel of joined petals on a stem: a hibiscus, amaryllis or lily (a long column of stamens if `column`), hanging (an angel's trumpet) or upright (a gentian). */
   | { kind: 'trumpet'; length: number; flare: number; lobes: number; hang?: boolean; column?: string; leaves?: LeafHabit }
+  /** A ring of hanging bells under a tuft of leaves, on a tall bare stem (crown imperial). */
+  | { kind: 'crown'; bells: number; size: number; leaves?: LeafHabit }
   /** A woody mound with its own leaves, carrying many small blooms (camellia, hibiscus, plumbago, oleander…). */
   | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'ferny'; leafColor?: string }
   | {
@@ -962,7 +965,7 @@ export const SPECIES: FlowerSpecies[] = BASE.map((sp) => {
   const o = ORIGINS[sp.id];
   if (!o && !(sp.region && sp.latin && sp.native)) throw new Error(`No origin for ${sp.id}`);
   return { ...sp, region: sp.region ?? o[0], latin: sp.latin ?? o[1], native: sp.native ?? o[2] } as FlowerSpecies;
-}).concat(AFRICA, OCEANIA, EAST_ASIA, SOUTH_ASIA, MEXICO, SOUTH_AMERICA, NORTH_AMERICA);
+}).concat(AFRICA, OCEANIA, EAST_ASIA, SOUTH_ASIA, MEXICO, SOUTH_AMERICA, NORTH_AMERICA, MEDITERRANEAN);
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';
