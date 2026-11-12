@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { regrow } from '../core/regrow';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
-import { SPECIES, type FlowerSpecies } from './flowerSpecies';
+import type { FlowerSpecies } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
 import { Patches, sharedGeometry, swapDetail } from '../render/patches';
 import type { Season } from './season';
@@ -999,7 +999,8 @@ function strip(m: FlowerMesh, a: THREE.Vector3, b: THREE.Vector3, w: number, col
  * skirts). Smaller towards the tip.
  */
 function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shape: 'heart' | 'bell' }, height: number, rng: () => number): THREE.BufferGeometry {
-  const stems = 2 + Math.floor(rng() * 2);
+  const far = isFar();
+  const stems = far ? 2 : 2 + Math.floor(rng() * 2);
   let headY = 0;
   for (let s = 0; s < stems; s++) {
     const az = (s / stems) * Math.PI * 2 + (rng() - 0.5) * 0.8;
@@ -1007,10 +1008,11 @@ function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shap
     const reach = height * lerp(0.55, 0.8, rng());
     const h = height * lerp(0.85, 1.05, rng());
     const pt = (t: number) => new THREE.Vector3().addScaledVector(d, reach * t).addScaledVector(UP, h * Math.sin(t * Math.PI * 0.72));
-    for (let k = 0; k < 7; k++) strip(m, pt(k / 7), pt((k + 1) / 7), 0.0035 * (1 - k / 10));
+    const segs = far ? 3 : 7;
+    for (let k = 0; k < segs; k++) strip(m, pt(k / segs), pt((k + 1) / segs), 0.0035 * (1 - k / 10));
     headY = Math.max(headY, pt(0.7).y);
     // Solomon's seal: leaves held out along the arch.
-    if (f.shape === 'bell' && f.florets > 7) {
+    if (f.shape === 'bell' && f.florets > 7 && !far) {
       for (let k = 2; k < 7; k++) {
         const p = pt(k / 8);
         const side = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(k % 2 ? 1 : -1);
@@ -1019,35 +1021,40 @@ function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shap
         m.tri(p, tip, tip.clone().addScaledVector(d, -0.04), { color: LEAF, shade: [0.8, 1, 0.95] });
       }
     }
-    for (let k = 0; k < f.florets; k++) {
-      const t = lerp(0.38, 0.97, k / Math.max(1, f.florets - 1));
+    const nFlorets = far ? Math.ceil(f.florets * 0.5) : f.florets;
+    for (let k = 0; k < nFlorets; k++) {
+      const t = lerp(0.38, 0.97, k / Math.max(1, nFlorets - 1));
       const p = pt(t);
       const size = f.floretSize * HEAD * lerp(1.1, 0.65, k / f.florets) * lerp(0.9, 1.1, rng());
       const hang = p.clone().add(new THREE.Vector3(0, -size * 1.5, 0));
-      strip(m, p, hang, 0.0015);
+      if (!far) strip(m, p, hang, 0.0015);
       if (f.shape === 'heart') {
-        const heart = new THREE.OctahedronGeometry(size, 1);
+        const heart = new THREE.OctahedronGeometry(size * (far ? 1.3 : 1), far ? 0 : 1);
         heart.scale(1.15, 0.95, 0.6);
         heart.rotateY(az);
         heart.translate(hang.x, hang.y - size * 0.6, hang.z);
         m.addGeometry(heart, WHITE, true, p, 0);
-        const drop = new THREE.ConeGeometry(size * 0.3, size * 0.9, 5);
-        drop.rotateX(Math.PI);
-        drop.translate(hang.x, hang.y - size * 1.7, hang.z);
-        m.addGeometry(drop, WHITE, true, p, 1);
+        if (!far) {
+          const drop = new THREE.ConeGeometry(size * 0.3, size * 0.9, 5);
+          drop.rotateX(Math.PI);
+          drop.translate(hang.x, hang.y - size * 1.7, hang.z);
+          m.addGeometry(drop, WHITE, true, p, 1);
+        }
       } else {
         // A bell: the outer flared cup, and a longer inner skirt in the second colour.
-        const bell = new THREE.ConeGeometry(size * 0.75, size * 1.6, 7, 1, true);
+        const bell = new THREE.ConeGeometry(size * (far ? 0.95 : 0.75), size * 1.6, far ? 4 : 7, 1, true);
         bell.translate(hang.x, hang.y - size * 0.8, hang.z);
         m.addGeometry(bell, WHITE, true, p, 0);
-        const skirt = new THREE.CylinderGeometry(size * 0.25, size * 0.5, size * 1.0, 6, 1, true);
-        skirt.translate(hang.x, hang.y - size * 1.9, hang.z);
-        m.addGeometry(skirt, WHITE, true, p, 1);
+        if (!far) {
+          const skirt = new THREE.CylinderGeometry(size * 0.25, size * 0.5, size * 1.0, 6, 1, true);
+          skirt.translate(hang.x, hang.y - size * 1.9, hang.z);
+          m.addGeometry(skirt, WHITE, true, p, 1);
+        }
       }
     }
   }
   // A few leaves at the foot.
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (far ? 2 : 4); i++) {
     const az = rng() * Math.PI * 2;
     const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
     const side = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(0.025);
@@ -1064,23 +1071,28 @@ function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shap
 /** A cloud of tiny florets on fine branching stems (baby's breath, lady's mantle). */
 function cloudHead(m: FlowerMesh, top: THREE.Vector3, f: { florets: number; spread: number; floretSize: number }, height: number, rng: () => number): THREE.BufferGeometry {
   const tips: THREE.Vector3[] = [];
-  const n = 7;
+  const far = isFar();
+  const n = far ? 4 : 7;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + rng() * 0.6;
     const r = f.spread * lerp(0.6, 1.1, rng());
     const tip = top.clone().add(new THREE.Vector3(Math.cos(a) * r, height * lerp(0.2, 0.4, rng()), Math.sin(a) * r));
     const mid = top.clone().lerp(tip, 0.5).add(new THREE.Vector3(0, 0.02, 0));
-    strip(m, top, mid, 0.002);
-    strip(m, mid, tip, 0.0015);
+    if (far) strip(m, top, tip, 0.003);
+    else {
+      strip(m, top, mid, 0.002);
+      strip(m, mid, tip, 0.0015);
+    }
     tips.push(tip);
   }
   tips.push(top.clone().add(new THREE.Vector3(0, height * 0.38, 0)));
-  for (let i = 0; i < f.florets; i++) {
+  const florets = far ? Math.ceil(f.florets * 0.45) : f.florets;
+  for (let i = 0; i < florets; i++) {
     const c = tips[i % tips.length];
     const r = f.spread * 0.45 * Math.cbrt(rng());
     const a = rng() * Math.PI * 2;
     const y = (rng() - 0.3) * f.spread * 0.4;
-    const g = new THREE.OctahedronGeometry(f.floretSize * HEAD * 0.6 * lerp(0.7, 1.3, rng()), 0);
+    const g = far ? new THREE.TetrahedronGeometry(f.floretSize * HEAD * 0.95 * lerp(0.7, 1.3, rng()), 0) : new THREE.OctahedronGeometry(f.floretSize * HEAD * 0.6 * lerp(0.7, 1.3, rng()), 0);
     g.translate(c.x + Math.cos(a) * r, c.y + y, c.z + Math.sin(a) * r);
     m.addGeometry(g, WHITE, true, top);
   }
@@ -1094,16 +1106,18 @@ function pincushionHead(m: FlowerMesh, top: THREE.Vector3, f: { size: number; sp
   const size = f.size * HEAD * 0.6;
   const centre = top.clone().add(new THREE.Vector3(0, size * (f.spiky ? 1 : 0.3), 0));
   if (f.spiky) {
-    const ball = new THREE.IcosahedronGeometry(size * 0.7, 1);
+    const far = isFar();
+    const ball = new THREE.IcosahedronGeometry(size * 0.7, far ? 0 : 1);
     ball.translate(centre.x, centre.y, centre.z);
     m.addGeometry(ball, WHITE, true, top);
     const q = new THREE.Quaternion();
-    for (let i = 0; i < 46; i++) {
-      const t = (i + 0.5) / 46;
+    const spikes = far ? 12 : 46;
+    for (let i = 0; i < spikes; i++) {
+      const t = (i + 0.5) / spikes;
       const phi = Math.acos(1 - 2 * t);
       const th = i * 2.39996;
       const dir = new THREE.Vector3(Math.sin(phi) * Math.cos(th), Math.cos(phi), Math.sin(phi) * Math.sin(th));
-      const spike = new THREE.ConeGeometry(size * 0.12, size * 0.55, 4);
+      const spike = new THREE.ConeGeometry(size * (far ? 0.2 : 0.12), size * 0.55, far ? 3 : 4);
       spike.translate(0, size * 0.85, 0);
       q.setFromUnitVectors(UP, dir);
       spike.applyQuaternion(q);
@@ -1112,17 +1126,19 @@ function pincushionHead(m: FlowerMesh, top: THREE.Vector3, f: { size: number; sp
     }
   } else {
     // The frill: a ring of wavy petals, open wide.
-    for (let i = 0; i < 14; i++) {
-      const az = (i / 14) * Math.PI * 2 + (rng() - 0.5) * 0.2;
+    const far = isFar();
+    const frill = far ? 6 : 14;
+    for (let i = 0; i < frill; i++) {
+      const az = (i / frill) * Math.PI * 2 + (rng() - 0.5) * 0.2;
       const hinge = top.clone().add(new THREE.Vector3(Math.cos(az) * size * 0.8, 0, Math.sin(az) * size * 0.8));
       petal(m, hinge, az, 1.35 + (rng() - 0.5) * 0.2, size * 1.1, size * 0.9, 0, 0.12, rng, { notch: true });
     }
-    const dome = new THREE.IcosahedronGeometry(size * 0.85, 1);
+    const dome = new THREE.IcosahedronGeometry(size * 0.85, far ? 0 : 1);
     dome.scale(1, 0.6, 1);
     dome.translate(centre.x, centre.y, centre.z);
     m.addGeometry(dome, WHITE, true, top, 0.35);
     // The pins: tiny pale florets dotted over the cushion.
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < (far ? 0 : 14); i++) {
       const a = i * 2.4;
       const r = Math.sqrt(i / 14) * size * 0.7;
       const pin = new THREE.IcosahedronGeometry(size * 0.1, 0);
@@ -1138,24 +1154,27 @@ function pincushionHead(m: FlowerMesh, top: THREE.Vector3, f: { size: number; sp
 /** Red hot poker: a torch of drooping tubes, gold at the bottom shading to scarlet at the top. */
 function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radius: number }, rng: () => number): THREE.BufferGeometry {
   // Grassy leaves arching from the base.
-  for (let i = 0; i < 8; i++) {
-    const az = (i / 8) * Math.PI * 2 + rng() * 0.4;
+  const far = isFar();
+  const nLeaves = far ? 4 : 8;
+  for (let i = 0; i < nLeaves; i++) {
+    const az = (i / nLeaves) * Math.PI * 2 + rng() * 0.4;
     const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
     const len = lerp(0.3, 0.45, rng());
-    leafStrip(m, (t, w) => d.clone().multiplyScalar(t * len * 0.6).addScaledVector(UP, Math.sin(t * Math.PI * 0.6) * len * 0.8).addScaledVector(new THREE.Vector3(-d.z, 0, d.x), w), (t) => 0.012 * (1 - t), 4, new THREE.Vector3(), 0.6);
+    leafStrip(m, (t, w) => d.clone().multiplyScalar(t * len * 0.6).addScaledVector(UP, Math.sin(t * Math.PI * 0.6) * len * 0.8).addScaledVector(new THREE.Vector3(-d.z, 0, d.x), w), (t) => 0.012 * (1 - t), far ? 2 : 4, new THREE.Vector3(), 0.6);
   }
   const L = f.length * 1.6;
-  const rings = 12;
+  // (From far off, a torch is a few rings of fewer, simpler tubes.)
+  const rings = far ? 5 : 12;
   for (let k = 0; k < rings; k++) {
     const t = k / (rings - 1);
     const y = top.y + t * L;
     const r = f.radius * 1.2 * (1 - t ** 3 * 0.65);
-    const per = 8;
+    const per = far ? 5 : 8;
     for (let i = 0; i < per; i++) {
       const az = (i / per) * Math.PI * 2 + (k % 2) * (Math.PI / per) + (rng() - 0.5) * 0.2;
       const out = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
       const dir = out.clone().multiplyScalar(0.45).add(new THREE.Vector3(0, -0.9, 0)).normalize();
-      const tube = new THREE.CylinderGeometry(0.0035, 0.005, 0.04, 4, 1);
+      const tube = far ? new THREE.CylinderGeometry(0.006, 0.008, 0.05, 3, 1) : new THREE.CylinderGeometry(0.0035, 0.005, 0.04, 4, 1);
       tube.translate(0, -0.02, 0);
       tube.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir));
       tube.translate(top.x + out.x * r, y, top.z + out.z * r);
@@ -1571,15 +1590,20 @@ export class Flowers {
     return have ?? buildShape(r, this.species);
   }
 
-  /** The shapes worth building ahead of time: everything a bed planted now might use. */
-  static wanted(season: Season): ShapeRecipe[] {
+  /**
+   * The shapes worth building ahead of time (in a worker): the foliage that every bed weaves in.
+   * A flower's own shapes are made when it is picked, or chosen for a bed (see `prepare`), so a
+   * big collection costs only what is planted.
+   */
+  static wanted(_season: Season): ShapeRecipe[] {
     const out: ShapeRecipe[] = [];
-    for (const sp of SPECIES) {
-      if (sp.zone || !(sp.seasons.includes(season) || sp.form.kind === 'foliage')) continue;
-      for (let v = 0; v < VARIANTS; v++) out.push({ kind: 'flower', species: sp.id, variant: v });
-    }
     for (const leaf of LEAF_KINDS) if (leaf !== 'clump') for (let v = 0; v < 3; v++) out.push({ kind: 'leaf', leaf, variant: v });
     return out;
+  }
+
+  /** Make a species' shapes now (a couple of milliseconds each), so its first plant doesn't have to. */
+  prepare(sp: FlowerSpecies) {
+    if (sp.form.kind !== 'foliage') this.variants(sp);
   }
 
   private makeMesh([geo, far]: [THREE.BufferGeometry, THREE.BufferGeometry], material: THREE.Material, capacity: number): THREE.InstancedMesh {
