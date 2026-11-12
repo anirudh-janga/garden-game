@@ -80,6 +80,8 @@ export class FlowerBrush {
   onPlace: (x: number, z: number, water: boolean) => void = () => {};
   private placeAt: THREE.Vector2 | null = null;
   private plan: BedPlan | null = null;
+  /** Beds whose shapes have been made (see `prepareBed`). */
+  private readonly prepared = new WeakSet<BedPlan>();
   private rng = createRng(4321);
   private last: THREE.Vector2 | null = null;
   private strokeTime = 0;
@@ -150,6 +152,9 @@ export class FlowerBrush {
   set selection(s: string) {
     const [rest, code] = s.split('@');
     this.selected = rest.split('#')[0];
+    // A flower picked by name: make its shapes now, not at its first plant.
+    const picked = SPECIES.find((sp) => sp.id === this.selected);
+    if (picked) this.flowers.prepare(picked);
     this.amount = code === 'c' ? 'clump' : code === '1' ? 'one' : 'drift';
   }
 
@@ -397,6 +402,11 @@ export class FlowerBrush {
     this.flowers.plant(sp, variant, at.x, y, at.y, yaw, scale, delay, look.open, look.color, look.edge);
   }
 
+  /** Make the shapes the bed will use before the first flower goes in (not in the middle of the stroke). */
+  private prepareBed(plan: BedPlan) {
+    for (const list of [plan.tiers.tall, plan.tiers.mid, plan.tiers.low]) for (const sp of list) this.flowers.prepare(sp);
+  }
+
   /** Plan a new bed (see BedPlan). With one species chosen, it's that species at every height. */
   private makePlan(): BedPlan {
     const { id } = this.choice();
@@ -441,6 +451,10 @@ export class FlowerBrush {
    */
   private plantBed(c: THREE.Vector2) {
     const plan = this.plan ?? (this.plan = this.makePlan());
+    if (!this.prepared.has(plan)) {
+      this.prepared.add(plan);
+      this.prepareBed(plan);
+    }
     const autumnal = this.season === 'autumn' || this.season === 'winter';
     // Foliage first: the bed fills with green (and silver, and bronze), then flowers rise through it.
     for (let i = 0; i < 3; i++) {
