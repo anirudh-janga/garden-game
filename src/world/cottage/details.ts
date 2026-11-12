@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { lerp } from '../../core/random';
 import { Kit, tone } from './kit';
 import { COLOURS, DORMER, PORCH, WING } from './plan';
+import { mainRoofHole } from './face';
+import { roofPoint } from './roof';
 const DORMER_CX = DORMER.cx;
 import type { WallKits } from './walls';
 
@@ -285,4 +287,111 @@ export function buildPlantings(kits: WallKits, rng: () => number) {
     const a = (i / 6) * Math.PI * 2 + rng();
     k.box(hx + Math.cos(a) * 0.16, 1.58 - rng() * 0.05, postZ - 0.05 + Math.sin(a) * 0.16, 0.03, 0.16 + rng() * 0.08, 0.03, tone(sea.leaf, rng, 0.06));
   }
+}
+
+/** A soft cap of snow: a thick pad with a narrower rounded top. */
+function cap(k: Kit, rng: () => number, x: number, y: number, z: number, w: number, d: number, h = 0.045) {
+  const c = tone(COLOURS.snow, rng, 0.02);
+  k.box(x, y + h / 2, z, w, h, d, c, (rng() - 0.5) * 0.04);
+  k.box(x, y + h * 0.9, z, w * 0.82, h * 0.7, d * 0.78, c.clone().multiplyScalar(1.02), (rng() - 0.5) * 0.06);
+}
+
+/** A flat leaf lying on a surface (a diamond, turned any way). */
+function leaf(k: Kit, rng: () => number, p: THREE.Vector3, n: THREE.Vector3, size: number, color: THREE.Color) {
+  const ref = Math.abs(n.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0);
+  const a = V().crossVectors(n, ref).normalize();
+  const b = V().crossVectors(n, a).normalize();
+  const t = rng() * Math.PI * 2;
+  const u = V().copy(a).multiplyScalar(Math.cos(t)).addScaledVector(b, Math.sin(t));
+  const v = V().copy(b).multiplyScalar(Math.cos(t)).addScaledVector(a, -Math.sin(t));
+  k.quad(V().copy(p).addScaledVector(u, size), V().copy(p).addScaledVector(v, size * 0.55), V().copy(p).addScaledVector(u, -size), V().copy(p).addScaledVector(v, -size * 0.55), color, n);
+}
+
+/** A pumpkin: ribbed rings swelling and closing, and a short stem. */
+function pumpkin(k: Kit, rng: () => number, x: number, y: number, z: number, r: number) {
+  const base = C('#e0802a');
+  const radii = [0.35, 0.8, 1, 0.82, 0.3];
+  const ys = [0, 0.25, 0.55, 0.9, 1.1];
+  const sides = 10;
+  const rings = radii.map((rad, j) => Array.from({ length: sides }, (_, i) => V(x + Math.cos((i / sides) * 6.283 + 0.2) * rad * r, y + ys[j] * r * 0.8, z + Math.sin((i / sides) * 6.283 + 0.2) * rad * r)));
+  for (let j = 0; j + 1 < rings.length; j++) {
+    for (let i = 0; i < sides; i++) {
+      const i2 = (i + 1) % sides;
+      const c = base.clone().multiplyScalar(i % 2 ? 0.9 : 1.03).offsetHSL((rng() - 0.5) * 0.02, 0, (rng() - 0.5) * 0.04);
+      const m = (i + 0.5) / sides * 6.283 + 0.2;
+      k.quad(rings[j][i], rings[j][i2], rings[j + 1][i2], rings[j + 1][i], c, V(Math.cos(m), 0.2, Math.sin(m)));
+    }
+  }
+  k.box(x, y + r * 0.95, z, 0.035, 0.07, 0.035, C('#6a7a38'), rng());
+}
+
+/**
+ * The season's dressing (design section 7). Winter: snow caps on sills, beams and the things in
+ * the yard, icicles along the front eave, a wreath on the shut door. Autumn: leaves fallen on the
+ * roof, the porch and the step, and three pumpkins by the step. (The snow on the roofs is built
+ * with the roofs, the door is shut in winter in `door`, the log store is full in `wing`.)
+ */
+export function buildSeasonal(kits: WallKits, rng: () => number) {
+  const k = kits.main;
+  const far = kits.far;
+  const { cx, postZ, beamY, floorY } = PORCH;
+  if (kits.season === 'winter') {
+    if (far) return;
+    // Caps on the window boxes, the back sills, and the pantry's.
+    cap(k, rng, -1.85, 1.36, 1.92, 0.94, 0.22);
+    cap(k, rng, 1.25, 1.26, 1.92, 1.54, 0.22);
+    cap(k, rng, DORMER.cx, 3.11, 1.55, 0.76, 0.22);
+    for (const x of [-1.3, 1.2]) cap(k, rng, x, 1.37, -1.9, 0.84, 0.2, 0.04);
+    // The bench, the barrel's lid, the chopping block, the logs, the porch beam, the chimney's cap and the wheelbarrow.
+    cap(k, rng, -1.85, 0.5, 2.12, 1.08, 0.32);
+    cap(k, rng, WING.x1 - 0.12, 0.64, WING.z1 + 0.2, 0.36, 0.42, 0.04);
+    cap(k, rng, 3.35, 0.27, WING.z1 + 0.4, 0.3, 0.3, 0.04);
+    cap(k, rng, 3.5, WING.plinth + 0.09 + 6 * 0.14 + 0.1, 0.75, 1.3, 0.5, 0.05);
+    cap(k, rng, cx, beamY + 0.08, postZ, 1.6, 0.16, 0.04);
+    cap(k, rng, -2.65, 5.69, 0, 0.62, 0.54, 0.05);
+    cap(k, rng, 1.9, 0.64, -2.12, 0.58, 0.44, 0.05);
+    // Icicles of different lengths along the front eave, either side of the porch.
+    const ice = tone('#dbe9f4', rng, 0.03);
+    for (let x = -2.75; x < 2.8; x += 0.1 + rng() * 0.14) {
+      if (x > cx - 1.15 && x < cx + 1.15) continue;
+      const len = 0.08 + rng() * rng() * 0.34;
+      k.prism(x, 2.03 - len, 2.1, 0.004, 0.022, len, 5, ice.clone().multiplyScalar(0.95 + rng() * 0.1));
+    }
+    // A wreath of evergreen, red berries and a bow, on the shut door.
+    const wz = 1.79;
+    const wy = 1.52;
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      blob(k, rng, cx + Math.cos(a) * 0.15, wy + Math.sin(a) * 0.15, wz, 0.045, tone('#2f5a33', rng, 0.08));
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = rng() * Math.PI * 2;
+      blob(k, rng, cx + Math.cos(a) * 0.15, wy + Math.sin(a) * 0.15, wz + 0.03, 0.018, C('#c4402e'));
+    }
+    k.box(cx, wy - 0.15, wz + 0.03, 0.12, 0.05, 0.02, C('#b03030'), 0.3);
+    k.box(cx, wy - 0.15, wz + 0.04, 0.03, 0.04, 0.02, C('#8a2020'));
+    return;
+  }
+  if (kits.season !== 'autumn') return;
+  // Fallen leaves: scattered on the roof (more caught beside the dormer and the chimney), the porch floor and step.
+  const cols = ['#c8622a', '#e0a82a', '#a8452a', '#8a6a2a', '#d4852a'];
+  const nOut = V(0, 0.77, 0.64);
+  const nBack = V(0, 0.77, -0.64);
+  const onRoof = (x: number, u: number, side: 1 | -1) => {
+    if (mainRoofHole(x, u)) return;
+    const p = roofPoint(x, u, side);
+    leaf(k, rng, p.add(V(0, 0.035, 0)), side === 1 ? nOut : nBack, 0.05 + rng() * 0.035, tone(cols[Math.floor(rng() * cols.length)], rng, 0.08));
+  };
+  if (!far) {
+    for (let i = 0; i < 40; i++) onRoof(-2.7 + rng() * 5.4, 0.04 + rng() * 0.5, 1);
+    for (let i = 0; i < 16; i++) onRoof(DORMER.cx + (rng() - 0.5) * 1.8, 0.45 + rng() * 0.3, 1);
+    for (let i = 0; i < 14; i++) onRoof(-2.55 + rng() * 0.8, 0.45 + rng() * 0.4, 1);
+    for (let i = 0; i < 18; i++) onRoof(-2.7 + rng() * 5.4, 0.04 + rng() * 0.5, -1);
+    for (let i = 0; i < 9; i++) leaf(k, rng, V(cx - 0.9 + rng() * 1.8, floorY + 0.012, 1.95 + rng() * 0.65), V(0, 1, 0), 0.05 + rng() * 0.03, tone(cols[Math.floor(rng() * cols.length)], rng, 0.08));
+    for (let i = 0; i < 6; i++) leaf(k, rng, V(cx - 0.7 + rng() * 1.4, 0.074, 2.8 + rng() * 0.3), V(0, 1, 0), 0.05 + rng() * 0.03, tone(cols[Math.floor(rng() * cols.length)], rng, 0.08));
+  }
+  // Three pumpkins by the step.
+  pumpkin(k, rng, cx - 0.62, 0.07, 2.92, 0.15);
+  pumpkin(k, rng, cx - 0.38, 0.07, 3.0, 0.1);
+  pumpkin(k, rng, cx - 0.88, 0.03, 3.3, 0.17);
 }

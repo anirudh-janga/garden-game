@@ -6,10 +6,11 @@ import type { WindField } from '../../render/wind';
 import type { SeasonPalette } from '../season';
 import { ChimeSet } from '../chimes';
 import { Smoke } from './smoke';
+import { addWet } from '../../render/wet';
 import { Kit } from './kit';
 import { buildMainRoof, ridgeY, roofPoint } from './roof';
 import { buildDormer, buildPorch, mainRoofHole } from './face';
-import { buildDetails, buildPlantings, WeatherVane } from './details';
+import { buildDetails, buildPlantings, buildSeasonal, WeatherVane } from './details';
 import type { Season } from '../season';
 import { buildChimney } from './chimney';
 import { buildWing } from './wing';
@@ -78,6 +79,7 @@ export class Cottage {
     this.near = { body: near.body, glass: near.glass };
     this.far = { body: far.body, glass: far.glass };
     this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    addWet(this.bodyMat, 0.8); // roof and stone darken and take a sheen in the rain
     this.glassMat = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: this.snowy ? 2.2 : 1.6 });
     this.body = new THREE.Mesh(near.body, this.bodyMat);
     this.glassMesh = new THREE.Mesh(near.glass, this.glassMat);
@@ -87,6 +89,7 @@ export class Cottage {
       this.group.add(m);
     }
     this.smoke = new Smoke(new THREE.Vector3(), seed + 3);
+    this.smoke.thick = this.snowy ? 1.5 : 1; // winter's chimney smokes harder
     this.group.updateMatrixWorld(true);
     this.smoke.moveTo(this.group.localToWorld(near.smoke.clone()));
     this.hangChimes();
@@ -113,6 +116,7 @@ export class Cottage {
     buildDormer(kits, rng, this.snowy);
     buildDetails(kits, rng);
     buildPlantings(kits, rng);
+    buildSeasonal(kits, rng);
     const smoke = buildChimney(main, rng, far);
     const body = main.geometry()!;
     const g = glass.geometry()!;

@@ -13,6 +13,8 @@ export class Smoke {
   private readonly alpha: Float32Array;
   private readonly size: Float32Array;
   private readonly rng: () => number;
+  /** 1 is a usual plume; winter's is thicker. */
+  thick = 1;
 
   constructor(private origin: THREE.Vector3, seed: number) {
     this.rng = createRng(seed);
@@ -97,8 +99,8 @@ export class Smoke {
       this.pos[k + 1] += this.vel[k + 1] * dt;
       this.pos[k + 2] += this.vel[k + 2] * dt;
       const t = this.age[i] / this.life[i];
-      this.alpha[i] = Math.min(1, t * 6) * (1 - t) * 0.55;
-      this.size[i] = lerp(0.35, 1.6, Math.sqrt(t));
+      this.alpha[i] = Math.min(1, t * 6) * (1 - t) * 0.55 * this.thick;
+      this.size[i] = lerp(0.35, 1.6, Math.sqrt(t)) * (0.85 + 0.15 * this.thick);
     }
     const geo = this.points.geometry;
     geo.attributes.position.needsUpdate = true;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { lerp } from '../../core/random';
 import { tone } from './kit';
 import { COLOURS, DOOR, DORMER, PORCH, REVEAL, type Opening } from './plan';
-import { clayTile, roofPoint, tileField } from './roof';
+import { clayTile, roofPoint, snowSheet, tileField } from './roof';
 import { at, boxIn, limewash, reveal, window, type Frame, type WallKits } from './walls';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -80,6 +80,7 @@ export function buildPorch(kits: WallKits, rng: () => number, snowy: boolean) {
       P,
       colour: ({ course }) => clayTile(rng, snowy, course),
     });
+    if (snowy) snowSheet(k, rng, { P, outward: V(sx * 0.7, 0.7, 0), rows: far ? 3 : 6, cols: far ? 3 : 6 });
     const soffit = tone(COLOURS.batten, rng, 0.02);
     const dn = (u: number, v: number) => P(u, v, V()).add(V(0, -0.05, 0));
     k.quad(dn(0, 0), dn(0, 1), dn(1, 1), dn(1, 0), soffit, V(0, -1, 0));
@@ -137,6 +138,7 @@ export function buildDormer(kits: WallKits, rng: () => number, snowy: boolean) {
       P,
       colour: ({ course }) => clayTile(rng, snowy, course),
     });
+    if (snowy) snowSheet(k, rng, { P, outward: V(sx * 0.7, 0.7, 0), rows: far ? 3 : 5, cols: far ? 3 : 5 });
     if (!far) {
       const batten = tone(COLOURS.batten, rng, 0.02);
       const deck = (u: number, v: number) => P(u, v, V()).add(V(-sx * 0.025, -0.025, 0));

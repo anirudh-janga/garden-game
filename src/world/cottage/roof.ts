@@ -114,7 +114,6 @@ export function tileField(kit: Kit, rng: () => number, f: TileField) {
 export function buildMainRoof(kit: Kit, rng: () => number, o: { far: boolean; snowy: boolean; skip?: (x: number, u: number, side: 1 | -1) => boolean }) {
   const width = ROOF_X1 - ROOF_X0;
   const slopeLen = Math.hypot(EAVE_Z, RIDGE_Y - EAVE_Y);
-  const snow = new THREE.Color(COLOURS.snow);
   // A tile missing near the chimney, on the sunny slope.
   const goneCourse = 9;
   const goneCol = 3;
@@ -148,11 +147,26 @@ export function buildMainRoof(kit: Kit, rng: () => number, o: { far: boolean; sn
         if ((COLOURS.tiles as readonly string[]).includes(hex)) c.lerp(CLAY, 0.3);
         // Broad patches where the sun has bleached the clay.
         c.offsetHSL(0, 0, 0.025 * Math.sin(x * 1.3 + u * 2.4 + side) * Math.sin(x * 0.7 - u * 1.9));
-        if (o.snowy) c.lerp(snow, course === 0 ? 0.3 : 0.82 - rng() * 0.12);
+        void course;
         void courses;
         return c;
       },
     });
+    if (o.snowy) {
+      snowSheet(kit, rng, {
+        P: (u, v, out) => roofPoint(ROOF_X0 + v * width, u, side, out),
+        outward,
+        rows: o.far ? 6 : 14,
+        cols: o.far ? 10 : 24,
+        // Bare round the chimney, where its warmth has melted the snow, and wherever the porch or dormer stand.
+        hole: (u, v) => {
+          const x = ROOF_X0 + v * width;
+          const z = side * EAVE_Z * (1 - u);
+          if (x < CHIMNEY.shaft[1] + 0.55 && Math.abs(z) < 0.7 && u > 0.5) return true;
+          return o.skip?.(x, u, side) ?? false;
+        },
+      });
+    }
     if (!o.far) {
       // The deck under the tiles (dark where a tile is missing): a coarse sheet a little below them.
       const batten = tone(COLOURS.batten, rng, 0.02);
@@ -216,6 +230,66 @@ export function clayTile(rng: () => number, snowy: boolean, course = 5, mossy = 
   if (mossy) hex = COLOURS.tileMoss;
   const c = tone(hex, rng, 0.05);
   if ((COLOURS.tiles as readonly string[]).includes(hex)) c.lerp(CLAY, 0.3);
-  if (snowy) c.lerp(new THREE.Color(COLOURS.snow), course === 0 ? 0.3 : 0.82 - rng() * 0.12);
+  void snowy;
+  void course;
   return c;
+}
+
+/**
+ * A blanket of snow over a roof: a soft sheet a few centimetres above the tiles, thicker toward the
+ * eaves, with a rounded lip rolling over the edge, left off in a few places (and wherever `hole` says,
+ * a chimney's warm patch) so the clay shows through.
+ */
+export function snowSheet(
+  kit: Kit,
+  rng: () => number,
+  f: {
+    P: (u: number, v: number, out: THREE.Vector3) => THREE.Vector3;
+    outward: THREE.Vector3;
+    rows: number;
+    cols: number;
+    hole?: (u: number, v: number) => boolean;
+  },
+) {
+  const { rows, cols } = f;
+  const grid: THREE.Vector3[][] = [];
+  const du = V();
+  const dv = V();
+  const n = V();
+  for (let j = 0; j <= rows; j++) {
+    const u = j / rows;
+    const row: THREE.Vector3[] = [];
+    for (let i = 0; i <= cols; i++) {
+      const v = i / cols;
+      const p = f.P(u, v, V());
+      f.P(Math.min(1, u + 0.02), v, du).sub(p);
+      f.P(u, Math.min(1, v + 0.02), dv).sub(p);
+      if (du.lengthSq() < 1e-8) f.P(Math.max(0, u - 0.02), v, du).sub(p).negate();
+      if (dv.lengthSq() < 1e-8) f.P(u, Math.max(0, v - 0.02), dv).sub(p).negate();
+      n.crossVectors(dv, du).normalize();
+      if (n.dot(f.outward) < 0) n.negate();
+      // Deeper toward the eaves, and a little different everywhere.
+      p.addScaledVector(n, 0.05 + 0.07 * (1 - u) + (rng() - 0.5) * 0.016);
+      row.push(p);
+    }
+    grid.push(row);
+  }
+  const white = new THREE.Color(COLOURS.snow);
+  const shade = new THREE.Color('#dce6f0');
+  const roll = V().copy(f.outward).setY(0).normalize().multiplyScalar(0.035).add(V(0, -0.08, 0));
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const u = (j + 0.5) / rows;
+      const v = (i + 0.5) / cols;
+      if (f.hole?.(u, v)) continue;
+      if (rng() < 0.015) continue; // a bare spot where it has slid or melted
+      const c = white.clone().lerp(shade, rng() * 0.25 + (1 - u) * 0.12);
+      kit.quad(grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i], c, f.outward);
+      if (j === 0) {
+        const a = grid[0][i];
+        const b = grid[0][i + 1];
+        kit.quad(a, b, V().copy(b).add(roll), V().copy(a).add(roll), shade.clone().lerp(white, 0.5), V().copy(f.outward).setY(0));
+      }
+    }
+  }
 }

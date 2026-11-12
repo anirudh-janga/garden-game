@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { lerp } from '../../core/random';
 import { Kit, run, tone } from './kit';
 import { COLOURS, WING } from './plan';
-import { tileField } from './roof';
+import { snowSheet, tileField } from './roof';
 import { stoneCourses, type WallKits } from './walls';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -72,7 +72,8 @@ export function buildWing(kits: WallKits, rng: () => number, snowy: boolean) {
   // Logs stacked to chest height against the partition: their pale ends face the front.
   const dark = tone('#3d332b', rng, 0.02);
   kit.quad(V(x0 + 0.15, WING.plinth, bayZ + 0.04), V(x1 - 0.15, WING.plinth, bayZ + 0.04), V(x1 - 0.15, 1.2, bayZ + 0.04), V(x0 + 0.15, 1.2, bayZ + 0.04), dark, V(0, 0, 1));
-  const rows = far ? 3 : 6;
+  // The log store is full by autumn and through the winter, half empty in the warm months.
+  const rows = far ? 3 : kits.season === 'autumn' || kits.season === 'winter' ? 7 : 4;
   for (let r = 0; r < rows; r++) {
     const y = WING.plinth + 0.09 + r * 0.14;
     const n = Math.floor((x1 - x0 - 0.4) / 0.16) - (r > 3 ? 4 + r : 0);
@@ -95,7 +96,6 @@ export function buildWing(kits: WallKits, rng: () => number, snowy: boolean) {
     kit.box(w.x + 0.03, w.y, w.z, 0.02, 0.02, 0.32, white);
   }
   // The roof: one slope, tiled like the main roof.
-  const snow = new THREE.Color(COLOURS.snow);
   const length = Math.hypot(EAVE_X - x0, WING.roofHigh - WING.roofLow);
   const slope = Math.atan2(WING.roofHigh - WING.roofLow, EAVE_X - x0);
   tileField(kit, rng, {
@@ -104,14 +104,21 @@ export function buildWing(kits: WallKits, rng: () => number, snowy: boolean) {
     width: SIDE * 2,
     outward: V(Math.sin(slope), Math.cos(slope), 0),
     P: (u, v, out) => out.set(lerp(EAVE_X, x0, u), lerp(WING.roofLow, WING.roofHigh, u), lerp(-SIDE, SIDE, v)),
-    colour: ({ u, course }) => {
+    colour: ({ u }) => {
       const c = tone(COLOURS.tiles[Math.floor(rng() * COLOURS.tiles.length)], rng, 0.05).lerp(new THREE.Color('#b0603e'), 0.3);
       if (rng() < 0.03) c.set(COLOURS.tileDark);
       if (u < 0.2 && rng() < 0.2) c.set(COLOURS.tileMoss);
-      if (snowy) c.lerp(snow, course === 0 ? 0.3 : 0.82 - rng() * 0.12);
       return c;
     },
   });
+  if (snowy) {
+    snowSheet(kit, rng, {
+      P: (u, v, out) => out.set(lerp(EAVE_X, x0, u), lerp(WING.roofLow, WING.roofHigh, u), lerp(-SIDE, SIDE, v)),
+      outward: V(Math.sin(slope), Math.cos(slope), 0),
+      rows: far ? 4 : 9,
+      cols: far ? 5 : 11,
+    });
+  }
   if (!far) {
     const batten = tone(COLOURS.batten, rng, 0.02);
     const n = V(Math.sin(slope), Math.cos(slope), 0).multiplyScalar(-0.035);
