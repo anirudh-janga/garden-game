@@ -15,6 +15,7 @@ const OUT = process.env.OUT || '.';
   await page.evaluate(() => { const e = { clientX: 5, clientY: 5, pointerId: 9, isPrimary: true, pointerType: 'touch', button: 0, buttons: 1, deltaY: 0, timeStamp: performance.now() }; window.world.pointer('pointerdown', e); window.world.pointer('pointerup', e); });
   await page.evaluate(() => document.querySelectorAll('body > *:not(canvas)').forEach((e) => (e.style.display = 'none')));
   await page.waitForTimeout(4000);
+  if (process.env.GROWN) await w.evaluate(() => { rebuildInstantly(); });
   console.log('triangles', JSON.stringify(await w.evaluate(() => ({ ...cottage.triangles, buildMs: Math.round(cottage.buildMs) }))));
   const views = (process.env.VIEWS === '' ? [] : (process.env.VIEWS || 'front,left,right,back,above,close,far').split(','));
   const spec = {

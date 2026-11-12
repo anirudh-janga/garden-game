@@ -117,8 +117,7 @@ Each is a small, simple, readable shape. Front and wing side unless noted.
 Always present (they are part of the design, not options):
 
 - **A climbing rose over the porch**: up both posts and over the porch gable, blush pink.
-- **Wisteria along the front eave**: a gnarled trunk at the front right corner, an arm under the
-  eave to the dormer, racemes hanging below it in late spring.
+- **Wisteria up the front right corner and along the right-hand rake of the roof**: a gnarled trunk, then an arm following the roof's edge up to the ridge, racemes hanging beside the wing's roof in late spring. (Planned along the front eave; moved because racemes half a metre long would have hung over the windows.)
 - **Ivy on the chimney and the left gable**, kept to the lower two thirds.
 - **Window boxes** on the kitchen, parlour and dormer sills, planted by season: bulbs in spring
   (yellow, white, blue), trailing geraniums and petunias in summer (red, pink, white), heather

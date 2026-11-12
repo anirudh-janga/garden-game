@@ -341,7 +341,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     if (key === cottageVines && !(regrow.instant || regrow.offset > 0)) return;
     cottageVines = key;
     vines.removeOwner(-1, regrow.instant || regrow.offset > 0);
-    for (const v of paths) vines.climb(v.points, { kind: v.kind, owner: -1, seed: v.seed, face: v.face, delay: 1.5, speed: v.kind === 'wisteria' ? 0.25 : 0.2 });
+    for (const v of paths) vines.climb(v.points, { kind: v.kind, owner: -1, seed: v.seed, face: v.face, delay: 1.5, speed: v.kind === 'wisteria' ? 0.25 : v.kind === 'ivy' ? 0.15 : 0.2 });
   };
   growCottageVines();
   const fenceBuilder = new FenceBuilder(
@@ -873,6 +873,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     regrow.instant = true;
     ambience.quiet = true;
     for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props, vines]) s.reset();
+    // (The cottage's own climbers are cleared with the rest: grow them back, grown.)
+    growCottageVines();
     for (const a of actions) controller.replay(a);
     // Mown this visit (or kept mown): the wildflowers stay mown through an undo.
     if (mownWild) wildflowers.clearIf(() => true);
