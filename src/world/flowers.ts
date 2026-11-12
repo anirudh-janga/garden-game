@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { regrow } from '../core/regrow';
 import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
-import type { FlowerSpecies } from './flowerSpecies';
+import type { FlowerSpecies, LeafHabit } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
+import { exoticGeometry, leafHabit, type Helpers } from './exotic';
 import { Patches, sharedGeometry, swapDetail } from '../render/patches';
 import type { Season } from './season';
 
@@ -1152,10 +1153,11 @@ function pincushionHead(m: FlowerMesh, top: THREE.Vector3, f: { size: number; sp
 }
 
 /** Red hot poker: a torch of drooping tubes, gold at the bottom shading to scarlet at the top. */
-function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radius: number }, rng: () => number): THREE.BufferGeometry {
-  // Grassy leaves arching from the base.
+function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radius: number; leaves?: LeafHabit }, rng: () => number): THREE.BufferGeometry {
+  // Grassy leaves arching from the base (or a rosette of thick ones: an aloe).
   const far = isFar();
-  const nLeaves = far ? 4 : 8;
+  if (f.leaves) leafHabit(m, helpers(), f.leaves, 0.3, rng);
+  const nLeaves = f.leaves ? 0 : far ? 4 : 8;
   for (let i = 0; i < nLeaves; i++) {
     const az = (i / nLeaves) * Math.PI * 2 + rng() * 0.4;
     const d = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
@@ -1164,12 +1166,12 @@ function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radiu
   }
   const L = f.length * 1.6;
   // (From far off, a torch is a few rings of fewer, simpler tubes.)
-  const rings = far ? 5 : 12;
+  const rings = far ? 4 : f.leaves ? 7 : 12;
   for (let k = 0; k < rings; k++) {
     const t = k / (rings - 1);
     const y = top.y + t * L;
     const r = f.radius * 1.2 * (1 - t ** 3 * 0.65);
-    const per = far ? 5 : 8;
+    const per = far ? 4 : f.leaves ? 6 : 8;
     for (let i = 0; i < per; i++) {
       const az = (i / per) * Math.PI * 2 + (k % 2) * (Math.PI / per) + (rng() - 0.5) * 0.2;
       const out = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
@@ -1186,6 +1188,9 @@ function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radiu
   geo.userData.headY = top.y + L;
   return geo;
 }
+
+/** What the newer shape builders (exotic.ts) borrow from here. */
+const helpers = (): Helpers => ({ petal, strip, leafStrip, stem, isFar, HEAD, LEAF, STEM, WHITE });
 
 export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: number): THREE.BufferGeometry {
   // Up close, a plant's own seed mixes in after its height is set, so each one is unique.
@@ -1213,6 +1218,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     geo.userData.headY = 0;
     return geo;
   }
+  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane') return exoticGeometry(sp, m, height, rng, helpers());
   if (sp.form.kind === 'arch') {
     const geo = archPlant(m, sp.form, height, rng);
     return geo;
@@ -1301,6 +1307,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       }
     }
     m.setTilt(null, null);
+    if (f.leaves) leafHabit(m, helpers(), f.leaves, Math.max(0.15, height * 0.5), rng);
   } else if (f.kind === 'cluster') {
     // Sedum and yarrow: a flat-topped head of tiny star florets; hydrangea a rounded mophead;
     // allium a ball of stars held up on its bare stem.
@@ -1324,9 +1331,19 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
       }
       const size = f.floretSize * lerp(0.8, 1.2, rng()) * (isFar() ? 1.4 : 1);
-      const g = isFar() ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.OctahedronGeometry(size, 0);
-      g.scale(1, 0.5, 1);
-      g.translate(attach.x, attach.y, attach.z);
+      let g: THREE.BufferGeometry;
+      if (f.floret === 'trumpet') {
+        // A little trumpet, open end up and out, set on a short pedicel.
+        g = new THREE.ConeGeometry(size * 0.55, size * 2.1, isFar() ? 4 : 6, 1, true).rotateX(Math.PI);
+        const out = new THREE.Vector3(attach.x - top.x, 0.5, attach.z - top.z);
+        if (out.x === 0 && out.z === 0) out.set(0, 1, 0);
+        g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, out.normalize()));
+        g.translate(attach.x, attach.y, attach.z);
+      } else {
+        g = isFar() ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.OctahedronGeometry(size, 0);
+        g.scale(1, 0.5, 1);
+        g.translate(attach.x, attach.y, attach.z);
+      }
       m.addGeometry(g, WHITE, true, top);
     }
     // Short branching stalks under the dome (an allium's stalks are hidden inside its ball).
@@ -1336,6 +1353,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const side = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.004);
       m.tri(top.clone().sub(side), tip, top.clone().add(side), { color: STEM });
     }
+    if (f.leaves) leafHabit(m, helpers(), f.leaves, Math.max(0.2, height * 0.45), rng);
   } else if (f.kind === 'cup') {
     for (let i = 0; i < f.petals; i++) {
       const inner = i % 2 === 1;
