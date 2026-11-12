@@ -876,6 +876,15 @@ function aquaticGrowing(m: FlowerMesh, type: AquaticType, height: number, size: 
       if (!isFar()) simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.008, 0)), 9, size * 0.75, size * 0.28, 0.55, 0.12, null, rng, { pointed: true });
       return top;
     }
+    case 'victoria': {
+      // A giant round pad with an upturned rim, floating; a white bloom beside it that turns pink.
+      pad(m, 0, 0, 0.42, 0.012, false, 0.06, rng);
+      pad(m, 0.55, 0.3, 0.2, 0.012, false, 0.05, rng);
+      const top = new THREE.Vector3(0.62, 0.03, -0.1);
+      simpleBloom(m, top, 14, size * 1.1, size * 0.34, 0.9, 0.1, new THREE.Color('#f2c230'), rng, { pointed: true });
+      if (!isFar()) simpleBloom(m, top.clone().add(new THREE.Vector3(0, 0.01, 0)), 10, size * 0.8, size * 0.3, 0.45, 0.14, null, rng, { pointed: true });
+      return top;
+    }
     case 'lotus': {
       // Big round leaves, some floating, some held up on stalks; a tall stem with a cupped bloom
       // around a golden seed-pod heart.
@@ -1314,6 +1323,18 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       centre.translate(top.x, top.y + f.centerSize * 0.25, top.z);
       m.addGeometry(centre, new THREE.Color(f.center), false, top);
     }
+    if (f.fringe) {
+      // A corona of fine filaments in a second colour, raised round the heart (a passion flower).
+      const col = new THREE.Color(f.fringe.color);
+      const n = isFar() ? 8 : f.fringe.count;
+      const fl = f.centerSize * 2.4;
+      for (let i = 0; i < n; i++) {
+        const az = (i / n) * Math.PI * 2;
+        const fil = new THREE.ConeGeometry(fl * 0.07, fl, 3, 1, true).translate(0, fl / 2, 0).rotateZ(-0.9).rotateY(-az);
+        fil.translate(top.x + Math.cos(az) * f.centerSize * 0.7, top.y + f.centerSize * 0.25, top.z + Math.sin(az) * f.centerSize * 0.7);
+        m.addGeometry(fil, col, false, top);
+      }
+    }
     if (f.corona) {
       // Daffodil: a frilled trumpet standing up out of the middle.
       const len = f.length * f.corona.length;
@@ -1364,6 +1385,10 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         const out = new THREE.Vector3(attach.x - top.x, 0.5, attach.z - top.z);
         if (out.x === 0 && out.z === 0) out.set(0, 1, 0);
         g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, out.normalize()));
+        g.translate(attach.x, attach.y, attach.z);
+      } else if (f.floret === 'pouch') {
+        // A little pouch (a slipper flower's inflated lip).
+        g = new THREE.IcosahedronGeometry(size * 1.3, 0).scale(1, 0.8, 1.2);
         g.translate(attach.x, attach.y, attach.z);
       } else {
         g = isFar() ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.OctahedronGeometry(size, 0);

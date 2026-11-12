@@ -502,7 +502,7 @@ function trumpet(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpe
   const flare = f.flare * H.HEAD;
   const sides = far ? 5 : 8;
   if (f.hang) m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI * 0.95 - 0.2 * rng()));
-  else m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(V(Math.cos(rng() * 6), 0, Math.sin(rng() * 6)), 0.5 * rng() + 0.1));
+  else m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(V(Math.cos(rng() * 6), 0, Math.sin(rng() * 6)), 0.55 + 0.45 * rng()));
   const funnel = new THREE.CylinderGeometry(flare, flare * 0.16, L, sides, 1, true).translate(top.x, top.y + L / 2, top.z);
   m.addGeometry(funnel, H.WHITE, true, top, 0);
   // The rim's lobes, turned out and back.
