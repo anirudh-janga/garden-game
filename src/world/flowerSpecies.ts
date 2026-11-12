@@ -18,6 +18,9 @@ export interface SmallBloom {
   centre?: string;
 }
 
+/** The kinds of water plant (see `aquatic` in flowers.ts). */
+export type AquaticType = 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead' | 'starlily';
+
 export interface RadialForm {
   kind: 'radial';
   petals: [number, number];
@@ -54,7 +57,7 @@ export type FlowerForm =
   | { kind: 'spike'; florets: number; spikeLength: number; floretSize: number; bell: boolean }
   | {
       kind: 'aquatic';
-      type: 'lotus' | 'lily' | 'hyacinth' | 'flag' | 'marigold' | 'pickerel' | 'arrowhead';
+      type: AquaticType;
       /** Bloom size (metres, before storybook scaling). */
       size: number;
     }
@@ -93,6 +96,10 @@ export type FlowerForm =
   | { kind: 'spathe'; style: 'funnel' | 'flat' | 'hood'; size: number; spadix: string; leaves?: LeafHabit }
   /** Boat-shaped bracts: a beak with a fan of sepals and a blue tongue (bird of paradise), or a zigzag ladder of beaks (heliconia). */
   | { kind: 'crane'; style: 'bird' | 'zigzag'; size: number; leaves?: LeafHabit }
+  /** A one-sided row of tubular flowers along the top of an arching stem (freesia, crocosmia, kangaroo paw). */
+  | { kind: 'fan'; florets: number; size: number; arch: number; furry?: boolean; leaves?: LeafHabit }
+  /** An umbel (or one big bloom) of narrow, curled-back petals with long up-curved stamens (nerine, spider lily, flame lily). */
+  | { kind: 'spider'; heads: number; petals: number; length: number; width: number; open: number; stamens: string; wavy?: boolean; leaves?: LeafHabit }
   /** A woody mound with its own leaves, carrying many small blooms (camellia, hibiscus, plumbago, oleander…). */
   | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'ferny'; leafColor?: string }
   | {

@@ -323,7 +323,79 @@ function crane(m: FlowerMesh, H: Helpers, top: THREE.Vector3, f: Extract<FlowerS
   }
 }
 
-/** Builds the shapes of the newer kinds (bracts, spathe, crane, bush). Returns the geometry, with `headY` set. */
+
+/** A one-sided row of tubular flowers along an arching stem, smaller toward the tip. */
+function fan(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpecies['form'], { kind: 'fan' }>, rng: () => number): THREE.Vector3 {
+  const far = H.isFar();
+  const az = rng() * Math.PI * 2;
+  const d = V(Math.cos(az), 0, Math.sin(az));
+  const reach = height * f.arch;
+  const pt = (t: number) => d.clone().multiplyScalar(reach * t * t).add(V(0, height * Math.sin(t * Math.PI * 0.55) / Math.sin(Math.PI * 0.55), 0));
+  const segs = far ? 3 : 7;
+  for (let k = 0; k < segs; k++) H.strip(m, pt(k / segs), pt((k + 1) / segs), 0.0045 * (1 - (k / segs) * 0.5));
+  const n = far ? Math.ceil(f.florets * 0.6) : f.florets;
+  const s = f.size * H.HEAD;
+  let top = pt(1);
+  for (let i = 0; i < n; i++) {
+    const t = lerp(0.55, 1, i / Math.max(1, n - 1));
+    const p = pt(t);
+    const size = s * lerp(1, 0.55, i / n);
+    // Each tube points out and up from the same side of the stem, the open end flaring.
+    const dir = d.clone().multiplyScalar(0.8).add(V(0, 0.55, 0)).applyAxisAngle(UP, (i % 2 ? 1 : -1) * 0.25).normalize();
+    const tube = new THREE.CylinderGeometry(size * 0.55, size * 0.18, size * 2.2, far ? 4 : 6, 1, true).translate(0, size * 1.1, 0);
+    tube.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, dir)).translate(p.x, p.y, p.z);
+    m.addGeometry(tube, H.WHITE, true, p, f.furry ? 0.2 : 0);
+    if (f.furry && !far) {
+      // A kangaroo paw's tube is furred, split at the tip into little claws.
+      for (let c = 0; c < 3; c++) {
+        const claw = new THREE.ConeGeometry(size * 0.12, size * 0.7, 3).translate(0, size * 2.4, 0);
+        claw.rotateZ((c - 1) * 0.35).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, dir)).translate(p.x, p.y, p.z);
+        m.addGeometry(claw, H.WHITE, true, p, 1);
+      }
+    }
+    if (i === n - 1) top = p;
+  }
+  return top;
+}
+
+/** An umbel of spider blooms on a bare stem (or one big one): narrow curled petals round long up-curved stamens. */
+function spider(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpecies['form'], { kind: 'spider' }>, rng: () => number): THREE.Vector3 {
+  const far = H.isFar();
+  const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
+  const top = H.stem(m, height, lean, rng, false);
+  const heads = far ? Math.min(f.heads, 3) : f.heads;
+  const L = f.length * H.HEAD;
+  const w = f.width * H.HEAD;
+  const stam = new THREE.Color(f.stamens);
+  for (let h = 0; h < heads; h++) {
+    let centre = top.clone();
+    if (f.heads > 1) {
+      // A short stalk from the stem's top out to each head.
+      const a = (h / heads) * Math.PI * 2 + rng();
+      const out = V(Math.cos(a), 0, Math.sin(a));
+      centre = top.clone().addScaledVector(out, L * 0.9).add(V(0, L * 0.35 * (0.6 + rng() * 0.6), 0));
+      H.strip(m, top, centre, 0.0018);
+    }
+    const n = far ? 4 : f.petals;
+    const off = rng() * 6;
+    for (let i = 0; i < n; i++) {
+      const az = off + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.15;
+      H.petal(m, centre.clone(), az, f.open + (rng() - 0.5) * 0.12, L * lerp(0.9, 1.1, rng()), w * (far ? 1.5 : 1), f.wavy ? 0.3 : 0.1, 0.1, rng, { pointed: true });
+      if (!far && (f.heads <= 3 || i % 2 === 0)) {
+        // A stamen: a thin curve out and up, a speck of pollen on its tip.
+        const dd = V(Math.cos(az), 0, Math.sin(az));
+        const mid = centre.clone().addScaledVector(dd, L * 0.35).add(V(0, -L * 0.05, 0));
+        const tip = centre.clone().addScaledVector(dd, L * 0.7).add(V(0, L * 0.3, 0));
+        H.strip(m, centre, mid, 0.0012, stam);
+        H.strip(m, mid, tip, 0.001, stam);
+        m.addGeometry(new THREE.IcosahedronGeometry(0.004, 0).translate(tip.x, tip.y, tip.z), stam, false, centre);
+      }
+    }
+  }
+  return top;
+}
+
+/** Builds the shapes of the newer kinds (bracts, spathe, crane, bush, fan, spider). Returns the geometry, with `headY` set. */
 export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number, rng: () => number, H: Helpers): THREE.BufferGeometry {
   const f = sp.form;
   const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
@@ -331,6 +403,12 @@ export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number,
   if (f.kind === 'bush') {
     const top = bush(m, H, f, height, rng);
     headY = top.y;
+  } else if (f.kind === 'fan') {
+    headY = fan(m, H, height, f, rng).y;
+    leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);
+  } else if (f.kind === 'spider') {
+    headY = spider(m, H, height, f, rng).y;
+    leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);
   } else if (f.kind === 'bracts' || f.kind === 'spathe' || f.kind === 'crane') {
     const top = H.stem(m, height, lean, rng, false);
     if (f.kind === 'bracts') bractHead(m, H, top, f, rng);
