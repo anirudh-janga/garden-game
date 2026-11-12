@@ -65,7 +65,7 @@ export interface Opening {
 }
 export const DOOR: Opening = { id: 'door', wall: 'front', c: -0.7, w: 0.86, h: 1.85, sill: PLINTH_H, lights: 1, rows: 1 };
 export const WINDOWS: Opening[] = [
-  { id: 'kitchen', wall: 'front', c: -1.95, w: 0.8, h: 0.85, sill: 1.3, lights: 2, rows: 3 },
+  { id: 'kitchen', wall: 'front', c: -1.85, w: 0.8, h: 0.85, sill: 1.3, lights: 2, rows: 3 },
   { id: 'parlour', wall: 'front', c: 1.25, w: 1.45, h: 0.95, sill: 1.2, lights: 3, rows: 3 },
   { id: 'back-left', wall: 'back', c: -1.3, w: 0.7, h: 0.75, sill: 1.35, lights: 2, rows: 3 },
   { id: 'back-right', wall: 'back', c: 1.2, w: 0.7, h: 0.75, sill: 1.35, lights: 2, rows: 3 },
@@ -110,4 +110,34 @@ export const COLOURS = {
   flag: ['#b3a894', '#a59a87', '#bfb5a2'],
   iron: '#3b3a3c',
   snow: '#f1f5fa',
+} as const;
+
+// --- The porch over the front door and the dormer over the parlour ---------------------------
+export const PORCH = {
+  /** Centre (the door's), half-width of the roof's eaves, and how far the roof reaches out and back (z). */
+  cx: DOOR.c,
+  half: 0.95,
+  apexY: 2.85,
+  eaveY: 1.9,
+  frontZ: 2.78,
+  backZ: 1.5,
+  /** The two posts (offset from the centre) and the height of the collar beam. */
+  postX: 0.65,
+  postZ: 2.6,
+  beamY: 2.2,
+  floorY: 0.14,
+} as const;
+
+export const DORMER = {
+  cx: 1.25,
+  /** Half the width of its face, and the face's plane (z), sill height and the height of the face. */
+  half: 0.475,
+  faceZ: 1.45,
+  sillY: 2.95,
+  faceH: 0.75,
+  /** Its own roof: 45 degrees, eaves a little out from the face. */
+  eaveHalf: 0.62,
+  eaveY: 3.63,
+  apexY: 4.25,
+  backZ: 0.45,
 } as const;

@@ -23,7 +23,9 @@ const OUT = process.env.OUT || '.';
     right: { d: 26, az: 1.9, y: 1.9 },
     back: { d: 26, az: 3.4, y: 1.9 },
     above: { d: 34, az: 0.3, y: 1.0, top: true },
-    close: { d: 9, az: 0.15, y: 1.4 },
+    close: { d: 12, az: 0.25, y: 1.5 },
+    door: { d: 10, az: 0.1, y: 1.1 },
+    porch: { d: 14, az: 0.0, y: 1.7 },
     far: { d: 60, az: 0.2, y: 0.6 },
   };
   for (const v of views) {

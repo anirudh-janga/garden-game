@@ -50,8 +50,11 @@ const LIFT = 0.022; // how far a tile's lower edge stands off the one below
  * then one slipped a few centimetres, one missing. Far away, one flat quad per tile.
  */
 export function tileField(kit: Kit, rng: () => number, f: TileField) {
-  const courses = Math.max(3, Math.round(f.length / COURSE));
-  const cols = Math.ceil(f.width / TILE_W);
+  // Far off, a tile is a bigger patch of colour (fewer, larger quads).
+  const courseLen = f.far ? COURSE * 1.5 : COURSE;
+  const tileW = f.far ? TILE_W * 2 : TILE_W;
+  const courses = Math.max(3, Math.round(f.length / courseLen));
+  const cols = Math.ceil(f.width / tileW);
   const a = V();
   const b = V();
   const c = V();
@@ -66,9 +69,9 @@ export function tileField(kit: Kit, rng: () => number, f: TileField) {
     const shift = k % 2 ? 0.5 : 0;
     const wander = (rng() - 0.5) * 0.02; // each course drifts off true by a centimetre
     for (let i = -1; i <= cols; i++) {
-      const colour = f.colour({ u: (u0 + u1) / 2, v: ((i + shift + 0.5) * TILE_W) / f.width, course: k, col: i, courses });
-      const vL = Math.max(0, ((i + shift) * TILE_W + wander) / f.width);
-      const vR = Math.min(1, ((i + shift + 1) * TILE_W + wander) / f.width);
+      const colour = f.colour({ u: (u0 + u1) / 2, v: ((i + shift + 0.5) * tileW) / f.width, course: k, col: i, courses });
+      const vL = Math.max(0, ((i + shift) * tileW + wander) / f.width);
+      const vR = Math.min(1, ((i + shift + 1) * tileW + wander) / f.width);
       if (vR - vL < 0.01 / f.width * 10) continue;
       const vM = (vL + vR) / 2;
       if (f.skip && f.skip((u0 + u1) / 2, vM)) continue;
@@ -85,7 +88,7 @@ export function tileField(kit: Kit, rng: () => number, f: TileField) {
       }
       if (gone) continue; // the batten (the roof's deck) shows through
       const twist = (rng() - 0.5) * 0.012;
-      const uTop = Math.min(1, u0 + (1.3 * COURSE) / f.length);
+      const uTop = Math.min(1, u0 + (1.3 * courseLen) / f.length);
       // The tile's surface normal here, to stand its lower edge off.
       f.P(u0, vM, m);
       f.P(u0 + 0.02, vM, du).sub(m);
@@ -204,4 +207,15 @@ export function buildMainRoof(kit: Kit, rng: () => number, o: { far: boolean; sn
   for (const side of [1, -1] as const) {
     kit.timber(rng, V(ROOF_X0, EAVE_Y - 0.06, side * (EAVE_Z - 0.02)), V(ROOF_X1, EAVE_Y - 0.06, side * (EAVE_Z - 0.02)), 0.06, 0.1, oak(), { far: o.far, bow: 0.02 });
   }
+}
+
+/** A plain clay tile's colour (the palette, each one nudged, closer together than the palette: a roof, not a mosaic). */
+export function clayTile(rng: () => number, snowy: boolean, course = 5, mossy = false): THREE.Color {
+  let hex: string = COLOURS.tiles[Math.floor(rng() * COLOURS.tiles.length)];
+  if (rng() < 0.03) hex = COLOURS.tileDark;
+  if (mossy) hex = COLOURS.tileMoss;
+  const c = tone(hex, rng, 0.05);
+  if ((COLOURS.tiles as readonly string[]).includes(hex)) c.lerp(CLAY, 0.3);
+  if (snowy) c.lerp(new THREE.Color(COLOURS.snow), course === 0 ? 0.3 : 0.82 - rng() * 0.12);
+  return c;
 }
