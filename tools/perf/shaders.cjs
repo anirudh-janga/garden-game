@@ -23,8 +23,6 @@ const steps = [
   ['chimes', [{ kind: 'prop', item: 'chimes', points: [-9, 7] }]],
   ['gazebo', [{ kind: 'prop', item: 'gazebo', points: [-10, -2] }]],
   ['erase', [{ kind: 'erase', radius: 0.6, points: line(-6, 0, -5, 0, 4) }]],
-  ['cottage: all upgrades', [{ kind: 'cottage', style: '21231:pbfrvsw', points: [] }]],
-  ['cottage: other looks', [{ kind: 'cottage', style: '32412:pbfrvsw', points: [] }, { kind: 'cottage', style: '43050:f', points: [] }]],
 ];
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });

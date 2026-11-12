@@ -1,6 +1,4 @@
 import './style.css';
-import { DEFAULT_STYLE, decodeStyle, encodeStyle, type CottageStyle } from './world/cottageStyle';
-import { CottagePanel } from './ui/cottagePanel';
 import { mountWeatherPicker } from './ui/weatherPicker';
 import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from './game/share';
 import { mountVisitBanner } from './ui/visitBanner';
@@ -317,43 +315,11 @@ pickBackup.addEventListener('change', async () => {
 
 // The world says which tool is in hand: show its chips.
 handlers.toolChanged = ((tool: Tool) => {
-  cottagePanel.setVisible(false);
   picker.setVisible(tool === 'flowers');
   stylePicker.setVisible(tool === 'fence');
   decorPicker.setVisible(tool === 'decor');
   tidyPicker.setVisible(tool === 'erase');
   document.body.classList.toggle('picking', tool === 'flowers' || tool === 'fence' || tool === 'decor' || tool === 'erase');
-}) as (...a: never[]) => unknown;
-
-// --- The cottage: tap it to give it a new look --------------------------------------------
-/** The cottage's look: the last change saved, else as it was built. */
-const cottageStyle = (): CottageStyle => {
-  for (let i = store.actions.length - 1; i >= 0; i--) {
-    const a = store.actions[i];
-    if (a.kind === 'cottage') return decodeStyle(a.style);
-  }
-  return { ...DEFAULT_STYLE };
-};
-const cottagePanel = new CottagePanel(cottageStyle, (style, label) => {
-  world.setCottageStyle(style);
-  added({ kind: 'cottage', style: encodeStyle(style), points: [] });
-  toolbar.showLabel(label, 1400);
-});
-// A tap on the garden: on the cottage opens its drawer; anywhere else closes it.
-handlers.cottageTap = ((hit: boolean) => {
-  if (hit && !cottagePanel.open) {
-    picker.setVisible(false);
-    stylePicker.setVisible(false);
-    decorPicker.setVisible(false);
-    tidyPicker.setVisible(false);
-    cottagePanel.setVisible(true);
-    document.body.classList.add('picking');
-    ambience.tap(1.4);
-    toolbar.showLabel('Your cottage: tap a chip to change it', 2200);
-  } else if (!hit && cottagePanel.open) {
-    cottagePanel.setVisible(false);
-    world.setTool(toolbar.tool);
-  }
 }) as (...a: never[]) => unknown;
 
 // --- Undo / redo ---------------------------------------------------------------------------
