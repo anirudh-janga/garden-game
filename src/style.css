@@ -514,6 +514,29 @@ body.picking .sound-hint {
   font-weight: 700;
   color: #5a4228;
 }
+.book-back {
+  width: 30px;
+  height: 30px;
+  align-self: center;
+  margin-left: -6px;
+  border: none;
+  border-radius: 50%;
+  background: #efe2c8;
+  color: #6a5234;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.book-back[hidden] {
+  display: none;
+}
+.book-native {
+  font-size: 10px;
+  line-height: 1.15;
+  color: #8a7456;
+  text-align: center;
+}
 .book-count {
   font-size: 12px;
   color: #9a8466;

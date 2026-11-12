@@ -210,7 +210,7 @@ picker.onAmount = () => {
 const flowerBook = new FlowerBook('Flower book', SPECIES.filter((s) => s.form.kind !== 'foliage'), season, (id) => picker.pick(id), [
   { id: MIX_ID, name: 'Seasonal mix', art: icon(null), note: 'what’s blooming' },
   { id: WATER_MIX_ID, name: 'Water mix', art: icon(null, true), note: 'for ponds' },
-]);
+], true);
 const foliageBook = new FlowerBook('Foliage book', SPECIES.filter((s) => s.form.kind === 'foliage'), season, (id) => picker.pick(id));
 picker.onFoliage = () => {
   ambience.tap(1.1);
