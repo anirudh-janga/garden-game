@@ -5,7 +5,7 @@ the detail behind them. Delete it when both milestones are done.
 
 ## 1. Where things stand
 
-Nothing in Milestones 11 or 12 is built. The planning is done:
+Milestone 11 (the cottage, 11.1–11.7) is built and live; 11.8 (a cat) is optional and not started. Milestone 12 (the flowers) is not started. The planning is done:
 
 | What | Where |
 |---|---|
@@ -13,9 +13,8 @@ Nothing in Milestones 11 or 12 is built. The planning is done:
 | The cottage's design: sizes, colours, every detail | `docs/cottage-design.md`, front view in `docs/cottage-elevation.svg` |
 | The plant list: 145 new plants in nine regions, origins of today's 85, the new shapes | `docs/flower-atlas.md` |
 
-The player asked for both at once and set no order. Default order: 11.1 → 11.7, then 12.1 →
-12.13. If the player says "flowers first", start at 12.1. 11.8 (a cat) is optional: ask before
-building it.
+Next: 12.1 → 12.13, in order (the regional stories can go in any order the player likes). 11.8 (a cat)
+is optional: ask before building it.
 
 The player's instruction for this planning session was "create stories, don't implement". Whoever
 picks this up should wait for the player to say go, then work one story at a time: build, deploy,
