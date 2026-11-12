@@ -44,7 +44,7 @@ turn in the world (`cottagePos`, yaw −0.18).
 | **Other walls** | Oak frame with limewashed panels (section 4). |
 | **Lean-to wing** | Against the right gable: 1.9 wide (x from +2.6 to +4.5) × 2.6 deep, its front set back 0.5 from the main front (z from −1.3 to +1.3). Its roof is a single slope (35°) falling to the right from y = 2.75 on the gable to eaves at y = 1.55. Back two thirds: a pantry, walled in weathered vertical boards with one small window. Front third: an open log store (two oak posts, logs stacked to chest height). |
 | **Porch** | Open, gabled, centred on the door at x = −0.70: 1.40 wide, projecting 0.85. Two oak posts (0.14 square, on stone pads) with curved braces, a collar beam, a 45° tiled roof whose ridge meets the wall at y = 3.05. A flagstone floor one step (0.14) above the ground, and one wide worn step. |
-| **Dormer** | One gabled dormer in the front slope above the parlour window (x = +1.25): 0.95 wide, face 0.75 high, its sill at y = 2.75, timber cheeks, its own little 45° tiled roof with a tiny sag. |
+| **Dormer** | One gabled dormer in the front slope above the parlour window (x = +1.25): 0.95 wide, its face a vertical plane at z = 1.45 (where the slope is at y ≈ 3.0), face 0.75 high, so its sill is at y ≈ 3.0 and its apex at y ≈ 4.2, timber cheeks running back into the slope, its own little 45° tiled roof with a tiny sag. (Corrected while building 11.3: the slope is too far out at y = 2.75 for a vertical face to stand on it.) |
 
 Footprint for `contains()`: the main range plus plinth, the chimney (to x = −3.2), the wing (to
 x = +4.6) and the porch with its step (to z = +3.0), each as its own rectangle rather than one big
