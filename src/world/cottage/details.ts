@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { lerp } from '../../core/random';
 import { Kit, tone } from './kit';
-import { COLOURS, PORCH, WING } from './plan';
+import { COLOURS, DORMER, PORCH, WING } from './plan';
+const DORMER_CX = DORMER.cx;
 import type { WallKits } from './walls';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -208,5 +209,80 @@ export class WeatherVane {
     d -= Math.round(d / (Math.PI * 2)) * Math.PI * 2;
     this.angle += d * (1 - Math.exp(-dt * 0.8));
     this.vane.rotation.y = this.angle + Math.sin(this.time * 7) * 0.03 * Math.min(1, gust);
+  }
+}
+
+/** A little irregular blob of colour (a bloom, a berry, a tuft): an octahedron pushed about. */
+function blob(k: Kit, rng: () => number, x: number, y: number, z: number, r: number, color: THREE.Color) {
+  const j = () => 1 + (rng() - 0.5) * 0.4;
+  const p = [V(x + r * j(), y, z), V(x - r * j(), y, z), V(x, y + r * 1.1 * j(), z), V(x, y - r * 0.7 * j(), z), V(x, y, z + r * j()), V(x, y, z - r * j())];
+  const c = V(x, y, z);
+  const face = (a: number, b: number, d: number) => k.tri(p[a], p[b], p[d], color, V().add(p[a]).add(p[b]).add(p[d]).sub(c.clone().multiplyScalar(3)));
+  face(0, 2, 4);
+  face(2, 1, 4);
+  face(1, 3, 4);
+  face(3, 0, 4);
+  face(2, 0, 5);
+  face(1, 2, 5);
+  face(3, 1, 5);
+  face(0, 3, 5);
+}
+
+/** What grows in the window boxes and the hanging basket, by the season. */
+function seasonal(season: WallKits['season']): { colours: string[]; upright: boolean; trailing: boolean; leaf: string } {
+  switch (season) {
+    case 'spring':
+      return { colours: ['#f2d23a', '#fbf8f2', '#6a8fd6', '#f2d23a'], upright: true, trailing: false, leaf: '#5f9a3e' };
+    case 'summer':
+      return { colours: ['#d9483b', '#f08fb4', '#fbf8f2', '#e86a8a'], upright: false, trailing: true, leaf: '#4f8a38' };
+    case 'autumn':
+      return { colours: ['#c8622a', '#e0a82a', '#7a3f6a', '#e0a82a'], upright: false, trailing: false, leaf: '#6a7a38' };
+    default:
+      return { colours: ['#c4402e', '#c4402e', '#3f6a3a', '#3f6a3a'], upright: true, trailing: false, leaf: '#2f5a33' };
+  }
+}
+
+/**
+ * Window boxes on the kitchen, parlour and dormer sills and the hanging basket, planted for the
+ * season: bulbs in spring, trailing geraniums and petunias in summer, heather and chrysanthemums
+ * in autumn, evergreen sprigs and red berries in winter.
+ */
+export function buildPlantings(kits: WallKits, rng: () => number) {
+  if (kits.far) return;
+  const k = kits.main;
+  const sea = seasonal(kits.season);
+  const wood = tone('#7a5236', rng, 0.04);
+  const planted = (cx: number, sillY: number, z: number, width: number) => {
+    k.box(cx, sillY - 0.0, z, width, 0.15, 0.2, wood.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.04));
+    k.box(cx, sillY + 0.07, z, width - 0.04, 0.02, 0.16, C('#4a3626'));
+    const n = Math.round(width * 11);
+    for (let i = 0; i < n; i++) {
+      const x = cx - width / 2 + 0.06 + (i / (n - 1)) * (width - 0.12) + (rng() - 0.5) * 0.03;
+      const zz = z + (rng() - 0.5) * 0.08;
+      const col = tone(sea.colours[Math.floor(rng() * sea.colours.length)], rng, 0.05);
+      const h = sea.upright ? 0.1 + rng() * 0.12 : 0.04 + rng() * 0.06;
+      blob(k, rng, x, sillY + 0.09 + h, zz, 0.032 + rng() * 0.012, col);
+      if (sea.upright) k.box(x, sillY + 0.09 + h / 2, zz, 0.008, h, 0.008, C(sea.leaf));
+      else blob(k, rng, x + (rng() - 0.5) * 0.03, sillY + 0.09, zz + 0.04, 0.035, tone(sea.leaf, rng, 0.06));
+      // Summer's geraniums and petunias spill over the front.
+      if (sea.trailing && i % 2 === 0) k.box(x, sillY - 0.04 - rng() * 0.05, z + 0.11, 0.025, 0.14 + rng() * 0.08, 0.012, tone(sea.leaf, rng, 0.06));
+    }
+  };
+  const front = 1.8 + 0.12;
+  planted(-1.85, 1.28, front, 0.9);
+  planted(1.25, 1.18, front, 1.5);
+  planted(DORMER_CX, 3.03, 1.45 + 0.1, 0.72);
+  // The hanging basket's planting (the basket itself is in `buildDetails`).
+  const { cx, postX, postZ } = PORCH;
+  const hx = cx - postX + 0.12;
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const r = 0.07 + rng() * 0.06;
+    const col = tone(sea.colours[Math.floor(rng() * sea.colours.length)], rng, 0.05);
+    blob(k, rng, hx + Math.cos(a) * r, 1.72 + rng() * 0.05, postZ - 0.05 + Math.sin(a) * r, 0.04 + rng() * 0.015, col);
+  }
+  if (sea.trailing) for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + rng();
+    k.box(hx + Math.cos(a) * 0.16, 1.58 - rng() * 0.05, postZ - 0.05 + Math.sin(a) * 0.16, 0.03, 0.16 + rng() * 0.08, 0.03, tone(sea.leaf, rng, 0.06));
   }
 }

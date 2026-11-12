@@ -7,9 +7,9 @@ import type { SeasonPalette } from '../season';
 import { ChimeSet } from '../chimes';
 import { Smoke } from './smoke';
 import { Kit } from './kit';
-import { buildMainRoof, ridgeY } from './roof';
+import { buildMainRoof, ridgeY, roofPoint } from './roof';
 import { buildDormer, buildPorch, mainRoofHole } from './face';
-import { buildDetails, WeatherVane } from './details';
+import { buildDetails, buildPlantings, WeatherVane } from './details';
 import type { Season } from '../season';
 import { buildChimney } from './chimney';
 import { buildWing } from './wing';
@@ -112,6 +112,7 @@ export class Cottage {
     buildPorch(kits, rng, this.snowy);
     buildDormer(kits, rng, this.snowy);
     buildDetails(kits, rng);
+    buildPlantings(kits, rng);
     const smoke = buildChimney(main, rng, far);
     const body = main.geometry()!;
     const g = glass.geometry()!;
@@ -172,11 +173,39 @@ export class Cottage {
   }
 
   /**
-   * Where climbers grow on this cottage (world points, from the root). None yet: the climbing
-   * roses and wisteria are drawn for the new walls in story 11.5.
+   * Where climbers grow on this cottage (world points, from the root): a blush climbing rose up the
+   * porch posts and over its gable, wisteria up the front right corner and along the right-hand
+   * rake of the roof (an arm along the eave would hang its flowers over the windows), and ivy over
+   * the chimney and the lower left gable.
    */
-  vinePaths(): { kind: 'rose' | 'wisteria'; points: THREE.Vector3[]; face: THREE.Vector3; seed: number }[] {
-    return [];
+  vinePaths(): { kind: 'rose' | 'wisteria' | 'ivy'; points: THREE.Vector3[]; face: THREE.Vector3; seed: number }[] {
+    const turn = new THREE.Vector3(0, 1, 0);
+    const world = (pts: [number, number, number][]) => pts.map(([x, y, z]) => V(x, y, z).multiplyScalar(COTTAGE_SCALE).applyAxisAngle(turn, this.yaw).add(this.position));
+    const facing = (x: number, y: number, z: number) => V(x, y, z).applyAxisAngle(turn, this.yaw);
+    const { cx, postX } = PORCH;
+    const rake: [number, number, number][] = [];
+    for (let i = 1; i <= 10; i++) {
+      const p = roofPoint(ROOF_X1, i / 10, 1);
+      rake.push([p.x + 0.12, p.y + 0.02, p.z + 0.1]);
+    }
+    return [
+      {
+        kind: 'rose',
+        face: facing(0, 0, 1),
+        seed: this.seed + 101,
+        points: world([[cx - postX, 0.3, 2.7], [cx - postX, 1.0, 2.7], [cx - postX, 1.8, 2.7], [cx - postX + 0.07, 2.3, 2.82], [cx - 0.35, 2.58, 2.86], [cx, 2.94, 2.86], [cx + 0.35, 2.58, 2.86], [cx + postX - 0.07, 2.3, 2.82], [cx + postX, 1.95, 2.7]]),
+      },
+      {
+        kind: 'wisteria',
+        face: facing(1, 0, 0.3),
+        seed: this.seed + 111,
+        points: world([[2.62, 0.3, 1.98], [2.75, 1.2, 2.04], [2.92, 1.9, 2.1], [2.98, 2.15, 2.15], ...rake]),
+      },
+      { kind: 'ivy', face: facing(-1, 0, 0), seed: this.seed + 121, points: world([[-2.78, 0.3, 1.4], [-2.78, 1.2, 1.36], [-2.78, 2.2, 1.46]]) },
+      { kind: 'ivy', face: facing(-1, 0, 0), seed: this.seed + 122, points: world([[-2.78, 0.3, -1.35], [-2.78, 1.3, -1.4], [-2.78, 2.1, -1.3]]) },
+      { kind: 'ivy', face: facing(0, 0, 1), seed: this.seed + 123, points: world([[-3.0, 0.2, 0.8], [-2.95, 1.5, 0.8], [-3.0, 2.6, 0.82], [-2.8, 3.4, 0.45]]) },
+      { kind: 'ivy', face: facing(-1, 0, 0), seed: this.seed + 124, points: world([[-3.3, 0.2, 0.25], [-3.3, 1.5, 0.1], [-3.3, 2.7, 0.2]]) },
+    ];
   }
 
   /** Places a bird could sit: along the roof ridge. */
