@@ -8,6 +8,8 @@ import { ChimeSet } from '../chimes';
 import { Smoke } from './smoke';
 import { Kit } from './kit';
 import { buildMainRoof, ridgeY } from './roof';
+import { buildDormer, buildPorch, mainRoofHole } from './face';
+import type { Season } from '../season';
 import { buildChimney } from './chimney';
 import { buildWing } from './wing';
 import { buildPlinth, buildStoneGable, buildTimberWalls, type Glow } from './walls';
@@ -58,6 +60,7 @@ export class Cottage {
     yaw: number,
     palette: SeasonPalette,
     private readonly seed: number,
+    private readonly season: Season = 'summer',
   ) {
     this.yaw = yaw;
     this.snowy = !!palette.snowy;
@@ -94,12 +97,14 @@ export class Cottage {
     const main = new Kit();
     const glass = new Kit();
     const glow: Glow[] = [];
-    const kits = { main, glass, far, glow };
+    const kits = { main, glass, far, glow, season: this.season };
     buildPlinth(main, rng, far);
     buildStoneGable(main, rng, far);
     buildTimberWalls(kits, rng);
     buildWing(kits, rng, this.snowy);
-    buildMainRoof(main, rng, { far, snowy: this.snowy });
+    buildMainRoof(main, rng, { far, snowy: this.snowy, skip: (x, u, side) => side === 1 && mainRoofHole(x, u) });
+    buildPorch(kits, rng, this.snowy);
+    buildDormer(kits, rng, this.snowy);
     const smoke = buildChimney(main, rng, far);
     const body = main.geometry()!;
     const g = glass.geometry()!;

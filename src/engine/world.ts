@@ -216,7 +216,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // The cottage sits at the back of the clearing, tucked against the trees, facing the player.
   const cottagePos = new THREE.Vector3(1.0, 0, -CLEARING_RADIUS + 3.6);
   cottagePos.y = ground.heightAt(cottagePos.x, cottagePos.z) - 0.05;
-  const cottage = new Cottage(cottagePos, -0.18, palette, WORLD_SEED + 30);
+  const cottage = new Cottage(cottagePos, -0.18, palette, WORLD_SEED + 30, season);
   scene.add(cottage.group);
   scene.add(cottage.smokePoints);
 

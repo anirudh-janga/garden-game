@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { lerp } from '../../core/random';
+import type { Season } from '../season';
 import { Kit, run, tone } from './kit';
 import {
   ATTIC,
@@ -33,9 +34,10 @@ export interface WallKits {
   glass: Kit;
   far: boolean;
   glow: Glow[];
+  season: Season;
 }
 
-interface Frame {
+export interface Frame {
   /** The point on the wall's face at u = 0, v = 0 (v is height). */
   origin: THREE.Vector3;
   /** Along the wall (unit), and the way the wall faces. */
@@ -45,12 +47,12 @@ interface Frame {
 
 const UP = V(0, 1, 0);
 /** A wall's frame. u runs to the viewer's right looking at it from outside. */
-function frame(wall: Wall): Frame {
+export function frame(wall: Wall): Frame {
   if (wall === 'front') return { origin: V(0, 0, WALL_Z1), u: V(1, 0, 0), normal: V(0, 0, 1) };
   if (wall === 'back') return { origin: V(0, 0, WALL_Z0), u: V(-1, 0, 0), normal: V(0, 0, -1) };
   return { origin: V(WALL_X1, 0, 0), u: V(0, 0, -1), normal: V(1, 0, 0) }; // right gable end, u toward the back
 }
-const at = (f: Frame, u: number, v: number, push = 0) => V().copy(f.origin).addScaledVector(f.u, u).addScaledVector(UP, v).addScaledVector(f.normal, push);
+export const at = (f: Frame, u: number, v: number, push = 0) => V().copy(f.origin).addScaledVector(f.u, u).addScaledVector(UP, v).addScaledVector(f.normal, push);
 
 /** Where the openings are on a wall, as rectangles [u0, u1, v0, v1] in the wall's own u (see `frame`). */
 function openingsOn(wall: Wall): { o: Opening; r: [number, number, number, number] }[] {
@@ -74,7 +76,7 @@ function breaks(lo: number, hi: number, step: number, extra: number[]): number[]
  * centimetre or so), each its own tone and mottled, damp at the foot. `hole` cells are left out
  * (windows, the door, the attic's round window); `limit` trims the top (a gable's triangle).
  */
-function limewash(
+export function limewash(
   kit: Kit,
   rng: () => number,
   f: Frame,
@@ -130,7 +132,7 @@ function limewash(
 }
 
 /** The glass, set back in its reveal, plus the reveal's four faces. Returns the glass's middle. */
-function reveal(kits: WallKits, rng: () => number, f: Frame, r: [number, number, number, number], withGlass = true): THREE.Vector3 {
+export function reveal(kits: WallKits, rng: () => number, f: Frame, r: [number, number, number, number], withGlass = true): THREE.Vector3 {
   const [u0, u1, v0, v1] = r;
   const wash = tone(COLOURS.limewash, rng, 0.03).multiplyScalar(0.9);
   const k = kits.main;
@@ -151,7 +153,7 @@ function reveal(kits: WallKits, rng: () => number, f: Frame, r: [number, number,
 }
 
 /** A casement window: stone sill, bowed oak lintel, painted frame, small panes, glowing glass. */
-function window(kits: WallKits, rng: () => number, f: Frame, o: Opening, uC: number) {
+export function window(kits: WallKits, rng: () => number, f: Frame, o: Opening, uC: number, opts: { shutters?: boolean } = {}) {
   const k = kits.main;
   const u0 = uC - o.w / 2;
   const u1 = uC + o.w / 2;
@@ -167,6 +169,13 @@ function window(kits: WallKits, rng: () => number, f: Frame, o: Opening, uC: num
   // Lintel: oak, bowed a little, standing a touch proud.
   const lin = tone(COLOURS.oak[Math.floor(rng() * 3)], rng, 0.04);
   k.timber(rng, at(f, u0 - 0.12, v1 + 0.07, 0.04), at(f, u1 + 0.12, v1 + 0.07, 0.04), 0.13, 0.15, lin, { bow: 0.015, far: kits.far });
+  if (opts.shutters !== false) {
+    const sw = 0.27;
+    const droop = () => (0.5 + rng() * 3.5) * (Math.PI / 180);
+    // (One shutter on the back wall has lost a plank.)
+    shutter(kits, rng, f, u0 - 0.03, -1, sw, v0 - 0.02, o.h + 0.04, droop(), o.id === 'back-right');
+    shutter(kits, rng, f, u1 + 0.03, 1, sw, v0 - 0.02, o.h + 0.04, droop(), false);
+  }
   if (kits.far) return;
   // The frame and glazing bars, soft-white, set partway into the reveal.
   const paint = tone(COLOURS.windowPaint, rng, 0.03);
@@ -191,10 +200,13 @@ function window(kits: WallKits, rng: () => number, f: Frame, o: Opening, uC: num
     for (let r = 1; r < o.rows; r++) bar(a, lerp(v0, v1, r / o.rows) - 0.012, b, lerp(v0, v1, r / o.rows) + 0.012, 0.024);
     if (o.w / o.lights > 0.3) bar((a + b) / 2 - 0.012, v0, (a + b) / 2 + 0.012, v1, 0.024);
   }
+  curtains(kits, rng, f, u0, u1, v0, v1);
+  // On a summer day the parlour's left light stands open.
+  if (o.id === 'parlour' && kits.season === 'summer') openSash(kits, rng, f, u0, v0, v1, (u1 - u0) / o.lights);
 }
 
 /** A box laid out in a wall's own directions (w along the wall, h up, depth along the normal), centred on `c`. */
-function boxIn(k: Kit, f: Frame, c: THREE.Vector3, w: number, h: number, depth: number, color: THREE.Color) {
+export function boxIn(k: Kit, f: Frame, c: THREE.Vector3, w: number, h: number, depth: number, color: THREE.Color) {
   const alongX = Math.abs(f.u.x) > 0.5;
   if (alongX) k.box(c.x, c.y, c.z, w, h, depth, color);
   else k.box(c.x, c.y, c.z, depth, h, w, color);
@@ -211,34 +223,36 @@ function door(kits: WallKits, rng: () => number, f: Frame) {
   const paint = new THREE.Color(COLOURS.paint);
   const worn = new THREE.Color(COLOURS.paintWorn);
   const widths = run(rng, DOOR.w - 0.04, 0.16, 0.27);
-  let u = u0 + 0.02;
+  // From spring to autumn the door stands a few degrees ajar, hinged on the left; in winter it is shut.
+  const ajar = kits.season === 'winter' ? 0 : (4 * Math.PI) / 180;
   const doorPush = -REVEAL * 0.35;
+  const hinge = u0 + 0.02;
+  const P = (u: number, v: number, extra = 0) => at(f, hinge + (u - hinge) * Math.cos(ajar), v, doorPush + extra + (u - hinge) * Math.sin(ajar));
+  // The dark room behind the door (seen through the gap when it's ajar).
+  kits.main.quad(at(f, u0, v0, -REVEAL + 0.004), at(f, u1, v0, -REVEAL + 0.004), at(f, u1, v1, -REVEAL + 0.004), at(f, u0, v1, -REVEAL + 0.004), new THREE.Color('#251a12'), f.normal);
+  let u = u0 + 0.02;
   for (const w of widths) {
     const top = v1 - 0.02 - (Math.abs((u + w / 2) - DOOR.c) / (DOOR.w / 2)) ** 2 * 0.1; // the arched head
     const c = tone(COLOURS.paint, rng, 0.05).lerp(worn, 0.15 + rng() * 0.15);
     const lowC = c.clone().lerp(worn, 0.5);
-    const a = at(f, u, v0 + 0.01, doorPush);
-    const b = at(f, u + w - 0.008, v0 + 0.01, doorPush);
-    const cc = at(f, u + w - 0.008, top, doorPush);
-    const d = at(f, u, top, doorPush);
-    kits.main.quadShaded(a, b, cc, d, lowC, lowC, c, c, f.normal);
+    kits.main.quadShaded(P(u, v0 + 0.01), P(u + w - 0.008, v0 + 0.01), P(u + w - 0.008, top), P(u, top), lowC, lowC, c, c, f.normal);
     // A little thickness: each plank's edge.
-    const e = at(f, u, v0 + 0.01, doorPush - 0.04);
-    const e2 = at(f, u, top, doorPush - 0.04);
-    kits.main.quad(e, a, d, e2, paint.clone().multiplyScalar(0.7), V().copy(f.u).negate());
+    kits.main.quad(P(u, v0 + 0.01, -0.04), P(u, v0 + 0.01), P(u, top), P(u, top, -0.04), paint.clone().multiplyScalar(0.7), V().copy(f.u).negate());
     u += w;
   }
   // Two long iron strap hinges, a ring handle and a small leaded light at eye height.
   const iron = new THREE.Color(COLOURS.iron);
-  for (const v of [v0 + 0.3, v1 - 0.35]) boxIn(k, f, at(f, u0 + DOOR.w * 0.3, v, doorPush + 0.012), DOOR.w * 0.55, 0.05, 0.012, iron);
-  boxIn(k, f, at(f, u1 - 0.14, v0 + 0.95, doorPush + 0.02), 0.05, 0.05, 0.02, iron);
-  const light = at(f, DOOR.c, v0 + 1.4, doorPush + 0.004);
-  boxIn(k, f, light, 0.18, 0.18, 0.012, tone(COLOURS.windowPaint, rng, 0.02));
-  const g0 = at(f, DOOR.c - 0.07, v0 + 1.4 - 0.07, doorPush + 0.012);
-  const g1 = at(f, DOOR.c + 0.07, v0 + 1.4 - 0.07, doorPush + 0.012);
-  const g2 = at(f, DOOR.c + 0.07, v0 + 1.4 + 0.07, doorPush + 0.012);
-  const g3 = at(f, DOOR.c - 0.07, v0 + 1.4 + 0.07, doorPush + 0.012);
-  kits.glass.quad(g0, g1, g2, g3, new THREE.Color('#ffffff'), f.normal);
+  for (const v of [v0 + 0.3, v1 - 0.35]) {
+    const a = P(u0 + 0.05, v - 0.025, 0.012);
+    const b = P(u0 + 0.05 + DOOR.w * 0.55, v - 0.025, 0.012);
+    kits.main.quad(a, b, P(u0 + 0.05 + DOOR.w * 0.55, v + 0.025, 0.012), P(u0 + 0.05, v + 0.025, 0.012), iron, f.normal);
+  }
+  const ring = P(u1 - 0.14, v0 + 0.95, 0.02);
+  kits.main.box(ring.x, ring.y, ring.z, 0.05, 0.05, 0.03, iron);
+  const lg = (du: number, dv: number) => P(DOOR.c + du, v0 + 1.4 + dv, 0.012);
+  const frameC = tone(COLOURS.windowPaint, rng, 0.02);
+  kits.main.quad(lg(-0.1, -0.1), lg(0.1, -0.1), lg(0.1, 0.1), lg(-0.1, 0.1), frameC, f.normal);
+  kits.glass.quad(lg(-0.07, -0.07), lg(0.07, -0.07), lg(0.07, 0.07), lg(-0.07, 0.07), new THREE.Color('#ffffff'), f.normal);
   // The lintel over it: oak, bowed.
   k.timber(rng, at(f, u0 - 0.16, v1 + 0.1, 0.05), at(f, u1 + 0.16, v1 + 0.1, 0.05), 0.16, 0.18, tone(COLOURS.oak[0], rng, 0.04), { bow: 0.018, far: kits.far });
   // A worn stone step, one riser high.
@@ -460,4 +474,81 @@ export function buildPlinth(kit: Kit, rng: () => number, far: boolean) {
   }
   // The left side's footing, in front of the stone gable.
   stoneCourses(kit, rng, { far, origin: V(WALL_X0 - proud, 0, 0), u: V(0, 0, 1), normal: V(-1, 0, 0), u0: WALL_Z0 - proud, u1: WALL_Z1 + proud, v0: 0, v1: PLINTH_H - 0.1, depth: 0.2, rowHeight: [0.18, 0.22] });
+}
+
+/** Cream curtains just inside the glass, tied back at each side. */
+function curtains(kits: WallKits, rng: () => number, f: Frame, u0: number, u1: number, v0: number, v1: number) {
+  const w = u1 - u0;
+  const push = -REVEAL + 0.012;
+  const cream = () => tone('#f3ead6', rng, 0.04);
+  for (const side of [-1, 1]) {
+    const edge = side < 0 ? u0 + 0.03 : u1 - 0.03;
+    // From the top it hangs full, gathers in to a tie at about half height, and flares again to the sill.
+    const top = w * 0.26;
+    const tie = w * 0.08;
+    const bot = w * 0.18;
+    const vt = v1 - 0.04;
+    const vm = v0 + (v1 - v0) * 0.45;
+    const vb = v0 + 0.05;
+    const q = (d: number, v: number) => at(f, edge + (side < 0 ? d : -d), v, push);
+    kits.main.quad(q(0, vt), q(top, vt), q(tie, vm), q(0, vm), cream(), f.normal);
+    kits.main.quad(q(0, vm), q(tie, vm), q(bot, vb), q(0, vb), cream(), f.normal);
+  }
+}
+
+/** A plank shutter hung open beside a window, on pintles, each at its own slight droop; a little heart cut out of it. */
+function shutter(kits: WallKits, rng: () => number, f: Frame, hinge: number, dir: 1 | -1, w: number, v0: number, h: number, droop: number, missingPlank: boolean) {
+  const paint = new THREE.Color(COLOURS.paint);
+  const worn = new THREE.Color(COLOURS.paintWorn);
+  const push0 = 0.05;
+  // t runs from the hinge (0) to the free edge (1).
+  const pt = (t: number, v: number, lift = 0) => at(f, hinge + dir * t * w * Math.cos(droop), v, push0 + t * w * Math.sin(droop) + lift);
+  const planks = kits.far ? 1 : 3;
+  for (let i = 0; i < planks; i++) {
+    if (missingPlank && i === 1) continue;
+    const t0 = i / planks;
+    const t1 = (i + 1) / planks - (kits.far ? 0 : 0.03);
+    const c = tone(COLOURS.paint, rng, 0.05).lerp(worn, 0.1 + rng() * 0.2);
+    const lowC = c.clone().lerp(worn, 0.4);
+    const a = pt(t0, v0);
+    const b = pt(t1, v0);
+    const cc = pt(t1, v0 + h);
+    const d = pt(t0, v0 + h);
+    kits.main.quadShaded(a, b, cc, d, lowC, lowC, c, c, f.normal);
+    if (!kits.far) kits.main.quad(a, pt(t0, v0, -0.03), pt(t0, v0 + h, -0.03), d, paint.clone().multiplyScalar(0.7), V().copy(f.u).multiplyScalar(-dir));
+  }
+  if (kits.far) return;
+  // The heart: a small dark cut-out, high on the shutter.
+  const vc = v0 + h * 0.74;
+  const dark = new THREE.Color('#2a2320');
+  const hp: THREE.Vector3[] = [];
+  const n = 12;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const x = 16 * Math.sin(a) ** 3;
+    const y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+    hp.push(pt(0.5 + (x * 0.0045) / w, vc + y * 0.0042, 0.004));
+  }
+  const mid = pt(0.5, vc - 0.005, 0.004);
+  for (let i = 0; i < n; i++) kits.main.tri(mid, hp[i], hp[(i + 1) % n], dark, f.normal);
+  // Two iron pintles at the hinge edge.
+  const iron = new THREE.Color(COLOURS.iron);
+  for (const v of [v0 + 0.12, v0 + h - 0.12]) boxIn(kits.main, f, pt(0, v, 0), 0.04, 0.03, 0.04, iron);
+}
+
+/** The parlour's left light, standing open (swung out 20 degrees on its hinge), with the room dark behind it. */
+function openSash(kits: WallKits, rng: () => number, f: Frame, u0: number, v0: number, v1: number, lw: number) {
+  const a = (20 * Math.PI) / 180;
+  const pt = (du: number, v: number) => at(f, u0 + du * Math.cos(a), v, -REVEAL * 0.55 + du * Math.sin(a));
+  // The room behind: the light's opening shows dark.
+  kits.main.quad(at(f, u0, v0, -REVEAL + 0.006), at(f, u0 + lw, v0, -REVEAL + 0.006), at(f, u0 + lw, v1, -REVEAL + 0.006), at(f, u0, v1, -REVEAL + 0.006), new THREE.Color('#2a2018'), f.normal);
+  const paint = tone(COLOURS.windowPaint, rng, 0.02);
+  kits.glass.quad(pt(0.04, v0 + 0.04), pt(lw - 0.02, v0 + 0.04), pt(lw - 0.02, v1 - 0.04), pt(0.04, v1 - 0.04), new THREE.Color('#ffffff'), f.normal);
+  const bar = (d0: number, d1: number, va: number, vb: number) => kits.main.quad(pt(d0, va), pt(d1, va), pt(d1, vb), pt(d0, vb), paint, f.normal);
+  bar(0, lw, v0, v0 + 0.04);
+  bar(0, lw, v1 - 0.04, v1);
+  bar(0, 0.04, v0, v1);
+  bar(lw - 0.04, lw, v0, v1);
+  bar(lw / 2 - 0.012, lw / 2 + 0.012, v0, v1);
+  bar(0, lw, (v0 + v1) / 2 - 0.012, (v0 + v1) / 2 + 0.012);
 }
