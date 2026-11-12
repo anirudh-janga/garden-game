@@ -1011,7 +1011,7 @@ function strip(m: FlowerMesh, a: THREE.Vector3, b: THREE.Vector3, w: number, col
  * hanging in a row under the arch (Solomon's seal, with leaves along the stem; fuchsia's two-tone
  * skirts). Smaller towards the tip.
  */
-function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shape: 'heart' | 'bell' | 'tube' | 'pea' }, height: number, rng: () => number): THREE.BufferGeometry {
+function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shape: 'heart' | 'bell' | 'tube' | 'pea' | 'lantern' }, height: number, rng: () => number): THREE.BufferGeometry {
   const far = isFar();
   const stems = far ? 2 : 2 + Math.floor(rng() * 2);
   let headY = 0;
@@ -1057,6 +1057,10 @@ function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shap
         // A long hanging tube, flared at the mouth (a kōwhai's golden lantern).
         const tube = new THREE.ConeGeometry(size * 0.5, size * 2.6, far ? 4 : 5, 1, true).translate(hang.x, hang.y - size * 1.3, hang.z);
         m.addGeometry(tube, WHITE, true, p, 0.3);
+      } else if (f.shape === 'lantern') {
+        // A papery puffed lantern with a little point at the bottom (a Chinese lantern plant's husk).
+        const husk = new THREE.IcosahedronGeometry(size * 1.1, 0).scale(0.85, 1.25, 0.85).translate(hang.x, hang.y - size * 1.1, hang.z);
+        m.addGeometry(husk, WHITE, true, p, 0);
       } else if (f.shape === 'pea') {
         // A pea flower: a broad banner behind and a curved keel (with a black boss, if the second colour is dark).
         const banner = new THREE.OctahedronGeometry(size * 1.1, far ? 0 : 1).scale(0.35, 1.1, 1).rotateY(az).translate(hang.x, hang.y - size * 0.6, hang.z);
@@ -1240,7 +1244,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     geo.userData.headY = 0;
     return geo;
   }
-  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane' || sp.form.kind === 'fan' || sp.form.kind === 'spider' || sp.form.kind === 'brush' || sp.form.kind === 'orchid') return exoticGeometry(sp, m, height, rng, helpers());
+  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane' || sp.form.kind === 'fan' || sp.form.kind === 'spider' || sp.form.kind === 'brush' || sp.form.kind === 'orchid' || sp.form.kind === 'trumpet') return exoticGeometry(sp, m, height, rng, helpers());
   if (sp.form.kind === 'arch') {
     const geo = archPlant(m, sp.form, height, rng);
     return geo;

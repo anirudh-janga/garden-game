@@ -157,7 +157,7 @@ function smallBloom(m: FlowerMesh, H: Helpers, at: THREE.Vector3, dir: THREE.Vec
       const n = far ? 3 : b.petals ?? 5;
       const off = rng() * 6;
       for (let i = 0; i < n; i++) {
-        const g = new THREE.CircleGeometry(size * 0.5, far ? 4 : 6).scale(0.8, 1.15, 1).rotateX(-Math.PI / 2 + 0.25).translate(0, 0.01, size * 0.55).rotateY(off + (i / n) * Math.PI * 2);
+        const g = new THREE.CircleGeometry(size * 0.5, far ? 4 : 5).scale(0.8, 1.15, 1).rotateX(-Math.PI / 2 + 0.25).translate(0, 0.01, size * 0.55).rotateY(off + (i / n) * Math.PI * 2);
         tinted(m, place(g), H.WHITE, at);
       }
       if (b.centre) fixed(m, place(new THREE.IcosahedronGeometry(size * 0.22, 0).translate(0, size * 0.1, 0)), b.centre, at);
@@ -493,7 +493,37 @@ function orchid(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpec
   return top;
 }
 
-/** Builds the shapes of the newer kinds (bracts, spathe, crane, bush, fan, spider, brush, orchid). Returns the geometry, with `headY` set. */
+/** One big flaring funnel on a stem: a hibiscus, amaryllis, lily; hanging (angel's trumpet) or upright (gentian). */
+function trumpet(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpecies['form'], { kind: 'trumpet' }>, rng: () => number): THREE.Vector3 {
+  const far = H.isFar();
+  const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
+  const top = H.stem(m, height, lean, rng, false);
+  const L = f.length * H.HEAD;
+  const flare = f.flare * H.HEAD;
+  const sides = far ? 5 : 8;
+  if (f.hang) m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI * 0.95 - 0.2 * rng()));
+  else m.setTilt(top, new THREE.Quaternion().setFromAxisAngle(V(Math.cos(rng() * 6), 0, Math.sin(rng() * 6)), 0.5 * rng() + 0.1));
+  const funnel = new THREE.CylinderGeometry(flare, flare * 0.16, L, sides, 1, true).translate(top.x, top.y + L / 2, top.z);
+  m.addGeometry(funnel, H.WHITE, true, top, 0);
+  // The rim's lobes, turned out and back.
+  const n = far ? Math.min(f.lobes, 4) : f.lobes;
+  const off = rng() * 6;
+  for (let i = 0; i < n; i++) {
+    const az = off + (i / n) * Math.PI * 2;
+    H.petal(m, top.clone().add(V(Math.cos(az) * flare * 0.9, L, Math.sin(az) * flare * 0.9)), az, 1.2 + (rng() - 0.5) * 0.15, flare * 1.0, flare * (n > 5 ? 0.55 : 0.8), 0.05, 0.1, rng, {});
+  }
+  if (f.column && !far) {
+    // A long column of stamens standing out of the throat, tipped with pollen.
+    const col = new THREE.Color(f.column);
+    const tip = top.clone().add(V(0, L * 1.3, 0));
+    m.addGeometry(new THREE.CylinderGeometry(0.0035, 0.0045, L * 1.3, 4).translate(top.x, top.y + L * 0.65, top.z), col, false, top);
+    m.addGeometry(new THREE.IcosahedronGeometry(0.008, 0).translate(tip.x, tip.y, tip.z), col, false, top);
+  }
+  m.setTilt(null, null);
+  return top.clone().add(V(0, L * 0.5, 0));
+}
+
+/** Builds the shapes of the newer kinds (bracts, spathe, crane, bush, fan, spider, brush, orchid, trumpet). Returns the geometry, with `headY` set. */
 export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number, rng: () => number, H: Helpers): THREE.BufferGeometry {
   const f = sp.form;
   const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
@@ -504,6 +534,9 @@ export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number,
   } else if (f.kind === 'fan') {
     headY = fan(m, H, height, f, rng).y;
     leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);
+  } else if (f.kind === 'trumpet') {
+    headY = trumpet(m, H, height, f, rng).y;
+    leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.4), rng);
   } else if (f.kind === 'brush') {
     headY = brush(m, H, height, f, rng).y;
     leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);

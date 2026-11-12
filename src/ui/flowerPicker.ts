@@ -202,6 +202,10 @@ function exoticIcon(sp: FlowerSpecies, c: string, svg: (inner: string) => string
     const tubes = Array.from({ length: 6 }, (_, i) => `<ellipse cx="${13 + i * 4}" cy="${16 - Math.sin(i / 5 * 2.2) * 6 + 4}" rx="2.1" ry="${4.2 - i * 0.3}" fill="${c}" stroke="rgba(0,0,0,.18)" stroke-width=".5" transform="rotate(${-25 + i * 6} ${13 + i * 4} ${16 - Math.sin(i / 5 * 2.2) * 6 + 4})"/>`).join('');
     return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 37C10 22 14 14 32 14" stroke="#5f8f3e" stroke-width="1.8" fill="none" stroke-linecap="round"/>${tubes}</svg>`;
   }
+  if (f.kind === 'trumpet') {
+    // A flaring funnel with a rim of lobes.
+    return svg(`<path d="M17 28L12 13c3 2 13 2 16 0l-5 15z" fill="${c}" stroke="rgba(0,0,0,.2)" stroke-width=".8"/>${[-1, 0, 1].map((k) => `<ellipse cx="${20 + k * 7}" cy="${12 + Math.abs(k)}" rx="3.4" ry="5" fill="${c}" transform="rotate(${k * 30} ${20 + k * 7} 14)"/>`).join('')}${f.column ? `<path d="M20 14V5" stroke="${f.column}" stroke-width="1.4"/><circle cx="20" cy="5" r="1.6" fill="${f.column}"/>` : ''}`);
+  }
   if (f.kind === 'brush') {
     // Filaments stacked up a stem (or a ball of them).
     if (f.style === 'dome') return svg(`${Array.from({ length: 22 }, (_, i) => `<path d="M20 16L${(20 + Math.cos(i * 0.9 - 1.4) * 11).toFixed(1)} ${(16 - Math.abs(Math.sin(i * 1.7)) * 9).toFixed(1)}" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`).join('')}`);
