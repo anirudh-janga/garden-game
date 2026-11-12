@@ -138,7 +138,7 @@ function smallBloom(m: FlowerMesh, H: Helpers, at: THREE.Vector3, dir: THREE.Vec
   const place = (g: THREE.BufferGeometry) => g.applyQuaternion(q).translate(at.x, at.y, at.z);
   switch (b.type) {
     case 'pom': {
-      tinted(m, place(new THREE.IcosahedronGeometry(size * 0.8, far ? 0 : 1).scale(1, 0.75, 1).translate(0, size * 0.3, 0)), H.WHITE, at);
+      tinted(m, place((far ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.IcosahedronGeometry(size * 0.8, 0)).scale(1, 0.75, 1).translate(0, size * 0.3, 0)), H.WHITE, at);
       break;
     }
     case 'trumpet': {
@@ -395,7 +395,105 @@ function spider(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpec
   return top;
 }
 
-/** Builds the shapes of the newer kinds (bracts, spathe, crane, bush, fan, spider). Returns the geometry, with `headY` set. */
+/** A brush of stiff filaments or tiny florets stacked up a stem: a cylinder, candle, dome, comb, plume, spire or flame. */
+function brush(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpecies['form'], { kind: 'brush' }>, rng: () => number): THREE.Vector3 {
+  const far = H.isFar();
+  const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
+  const top = H.stem(m, height, lean, rng, false);
+  const L = f.length * H.HEAD;
+  const R = f.radius * H.HEAD;
+  const tip = f.tip ? new THREE.Color(f.tip) : null;
+  const q = new THREE.Quaternion();
+  const rings = far ? 4 : f.style === 'dome' ? 6 : 8;
+  const comb = f.style === 'comb';
+  for (let i = 0; i < rings; i++) {
+    const t = rings > 1 ? i / (rings - 1) : 0;
+    // The profile of the whole head: radius and height of this ring.
+    let r = R;
+    let y = t * L;
+    let tilt = 0.55; // how far out from the axis the filaments lean
+    if (f.style === 'dome') {
+      const phi = t * Math.PI * 0.5;
+      r = Math.cos(phi) * R;
+      y = Math.sin(phi) * R;
+      tilt = 0.5 + t * 0.4;
+    } else if (f.style === 'spire' || f.style === 'plume') r = R * (1 - t * (f.style === 'plume' ? 0.9 : 0.75));
+    else if (f.style === 'flame') r = R * Math.sin(Math.PI * Math.pow(Math.min(1, t + 0.08), 0.7));
+    else if (f.style === 'cylinder') r = R * (i === rings - 1 ? 0.5 : 1);
+    const per = Math.max(3, Math.round((far ? 4 : f.style === 'candle' ? 8 : f.style === 'dome' ? 9 : 6) * (f.style === 'dome' ? Math.cos(t * 1.4) + 0.3 : 1 - t * 0.35)));
+    const base = top.clone().add(V(0, y, 0));
+    for (let k = 0; k < per; k++) {
+      const a = comb ? -1.4 + (k / Math.max(1, per - 1)) * 2.8 : (k / per) * Math.PI * 2 + i * 0.7 + rng() * 0.2;
+      const out = V(Math.cos(a), 0, Math.sin(a));
+      const dir = out.clone().multiplyScalar(Math.sin(tilt)).add(V(0, Math.cos(tilt) * (f.style === 'dome' ? 1 : 0.5), 0)).normalize();
+      q.setFromUnitVectors(UP, dir);
+      const p = base.clone().addScaledVector(out, r * 0.25);
+      let g: THREE.BufferGeometry;
+      if (f.style === 'spire' || f.style === 'plume' || f.style === 'flame') {
+        // Tiny florets (a little squashed ball each).
+        g = new THREE.OctahedronGeometry(Math.max(0.006, R * 0.22) * (far ? 1.6 : 1), 0).scale(1, 1.1, 1).translate(out.x * r * 0.7, 0, out.z * r * 0.7).translate(p.x - out.x * r * 0.25, p.y, p.z - out.z * r * 0.25);
+        m.addGeometry(g, H.WHITE, true, top, f.style === 'flame' ? t : 0);
+        continue;
+      }
+      const len = (f.style === 'candle' ? r * 0.55 : f.style === 'dome' ? R * 0.9 : r * 1.3) * (comb ? 1.5 : 1);
+      g = new THREE.ConeGeometry(Math.max(0.0035, r * 0.07), len, 3, 1, true).translate(0, len / 2, 0).applyQuaternion(q).translate(p.x, p.y, p.z);
+      m.addGeometry(g, H.WHITE, true, top, 0);
+      if (tip && !far && k % 2 === 0 && f.style !== 'candle') {
+        const e = p.clone().addScaledVector(dir, len);
+        m.addGeometry(new THREE.TetrahedronGeometry(Math.max(0.004, r * 0.08), 0).translate(e.x, e.y, e.z), tip, false, top);
+      }
+    }
+  }
+  // The core: a green cone through the middle (bottlebrush's shoot grows on beyond its flowers).
+  if (f.style === 'cylinder' || f.style === 'candle') {
+    m.addGeometry(new THREE.CylinderGeometry(R * 0.3, R * 0.3, L, far ? 3 : 5).translate(top.x, top.y + L / 2, top.z), H.STEM, false, top);
+    if (f.style === 'cylinder' && !far) m.addGeometry(new THREE.ConeGeometry(R * 0.28, L * 0.35, 4).translate(top.x, top.y + L * 1.15, top.z), H.LEAF, false, top);
+  }
+  return top;
+}
+
+/** An arching spray of orchid blooms. */
+function orchid(m: FlowerMesh, H: Helpers, height: number, f: Extract<FlowerSpecies['form'], { kind: 'orchid' }>, rng: () => number): THREE.Vector3 {
+  const far = H.isFar();
+  const az = rng() * Math.PI * 2;
+  const d = V(Math.cos(az), 0, Math.sin(az));
+  const reach = height * 0.5;
+  const pt = (t: number) => d.clone().multiplyScalar(reach * t * t).add(V(0, height * Math.sin(t * Math.PI * 0.5), 0));
+  const segs = far ? 3 : 6;
+  for (let k = 0; k < segs; k++) H.strip(m, pt(k / segs), pt((k + 1) / segs), 0.0035 * (1 - (k / segs) * 0.5));
+  const n = far ? Math.ceil(f.flowers * 0.6) : f.flowers;
+  const s = f.size * H.HEAD;
+  const lip = new THREE.Color(f.lip);
+  let top = pt(1);
+  for (let i = 0; i < n; i++) {
+    const t = lerp(0.45, 1, i / Math.max(1, n - 1));
+    const p = pt(t).add(V(0, 0.01, 0));
+    const side = i % 2 ? 1 : -1;
+    // The bloom faces out and a little up, to the side of the spray.
+    const facing = d.clone().multiplyScalar(0.9).add(V(0, 0.5, 0)).applyAxisAngle(UP, side * 0.8).normalize();
+    m.setTilt(p, new THREE.Quaternion().setFromUnitVectors(UP, facing));
+    const wide = f.type === 'moth' ? 1 : f.type === 'cattleya' ? 0.75 : 0.35;
+    const sizeI = s * lerp(1, 0.75, i / n);
+    const ox = f.type === 'slipper' ? 0 : 1;
+    // Three sepals (one up, two out to the sides) and two broad petals.
+    for (const a of [0, 2.1, -2.1]) H.petal(m, p.clone(), a + 1.57, f.type === 'star' ? 1.35 : 1.45, sizeI * (f.type === 'moth' ? 0.7 : 1), sizeI * 0.32 * (0.5 + wide), 0.1, 0.1, rng, { pointed: f.type === 'star' });
+    if (!far) for (const a of [1.05, -1.05]) H.petal(m, p.clone(), a + 1.57, 1.5, sizeI * 0.85, sizeI * 0.42 * (0.5 + wide), 0.1, 0.1, rng, { pointed: f.type === 'star' });
+    // The lip: a small frilled trumpet (cattleya), a pouch (slipper), or a flat tongue.
+    const lipG = f.type === 'slipper'
+      ? new THREE.SphereGeometry(sizeI * 0.32, 6, 5).scale(1, 0.9, 1.3).translate(0, -sizeI * 0.1, sizeI * 0.25)
+      : f.type === 'cattleya'
+        ? new THREE.ConeGeometry(sizeI * 0.32, sizeI * 0.8, 6, 1, true).rotateX(-Math.PI / 2 - 0.4).translate(0, 0, sizeI * 0.2)
+        : new THREE.OctahedronGeometry(sizeI * 0.22, 0).scale(1, 0.3, 1.4).translate(0, 0, sizeI * 0.15);
+    lipG.translate(p.x, p.y, p.z);
+    m.addGeometry(lipG, lip, false, p);
+    m.setTilt(null, null);
+    void ox;
+    if (i === n - 1) top = p;
+  }
+  return top;
+}
+
+/** Builds the shapes of the newer kinds (bracts, spathe, crane, bush, fan, spider, brush, orchid). Returns the geometry, with `headY` set. */
 export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number, rng: () => number, H: Helpers): THREE.BufferGeometry {
   const f = sp.form;
   const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
@@ -406,6 +504,12 @@ export function exoticGeometry(sp: FlowerSpecies, m: FlowerMesh, height: number,
   } else if (f.kind === 'fan') {
     headY = fan(m, H, height, f, rng).y;
     leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);
+  } else if (f.kind === 'brush') {
+    headY = brush(m, H, height, f, rng).y;
+    leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);
+  } else if (f.kind === 'orchid') {
+    headY = orchid(m, H, height, f, rng).y;
+    leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.4), rng);
   } else if (f.kind === 'spider') {
     headY = spider(m, H, height, f, rng).y;
     leafHabit(m, H, f.leaves ?? 'none', Math.max(0.2, height * 0.5), rng);

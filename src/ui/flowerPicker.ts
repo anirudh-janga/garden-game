@@ -202,6 +202,17 @@ function exoticIcon(sp: FlowerSpecies, c: string, svg: (inner: string) => string
     const tubes = Array.from({ length: 6 }, (_, i) => `<ellipse cx="${13 + i * 4}" cy="${16 - Math.sin(i / 5 * 2.2) * 6 + 4}" rx="2.1" ry="${4.2 - i * 0.3}" fill="${c}" stroke="rgba(0,0,0,.18)" stroke-width=".5" transform="rotate(${-25 + i * 6} ${13 + i * 4} ${16 - Math.sin(i / 5 * 2.2) * 6 + 4})"/>`).join('');
     return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 37C10 22 14 14 32 14" stroke="#5f8f3e" stroke-width="1.8" fill="none" stroke-linecap="round"/>${tubes}</svg>`;
   }
+  if (f.kind === 'brush') {
+    // Filaments stacked up a stem (or a ball of them).
+    if (f.style === 'dome') return svg(`${Array.from({ length: 22 }, (_, i) => `<path d="M20 16L${(20 + Math.cos(i * 0.9 - 1.4) * 11).toFixed(1)} ${(16 - Math.abs(Math.sin(i * 1.7)) * 9).toFixed(1)}" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`).join('')}`);
+    if (f.style === 'spire' || f.style === 'plume' || f.style === 'flame') return svg(Array.from({ length: 9 }, (_, i) => `<ellipse cx="${20 + (i % 2 ? 1.6 : -1.6)}" cy="${28 - i * 2.7}" rx="${5 - i * 0.4}" ry="2" fill="${c}"/>`).join(''));
+    const bars = Array.from({ length: 12 }, (_, i) => `<path d="M${20 + (i % 2 ? -2 : 2)} ${27 - i * 1.8}l${i % 2 ? -6 : 6} -1.5" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`).join('');
+    return svg(`${bars}<path d="M20 28V9" stroke="#8a7a50" stroke-width="1.4"/>`);
+  }
+  if (f.kind === 'orchid') {
+    // Two or three blooms along an arching spray.
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 37C9 20 14 11 30 9" stroke="#5f8f3e" stroke-width="1.6" fill="none"/>${[[14, 22], [20, 14], [27, 10]].map(([x, y]) => `<ellipse cx="${x}" cy="${y - 3}" rx="3.6" ry="4.4" fill="${c}"/><ellipse cx="${x - 3}" cy="${y + 1}" rx="4" ry="2.8" fill="${c}"/><ellipse cx="${x + 3}" cy="${y + 1}" rx="4" ry="2.8" fill="${c}"/><circle cx="${x}" cy="${y + 1}" r="2" fill="${f.lip}"/>`).join('')}</svg>`;
+  }
   if (f.kind === 'spider') {
     // Curled petals round long stamens.
     const petals = Array.from({ length: 6 }, (_, i) => `<path d="M20 17c${Math.cos(i * 1.05) * 6} ${Math.sin(i * 1.05) * 5 - 3} ${Math.cos(i * 1.05) * 11} ${Math.sin(i * 1.05) * 8 - 2} ${Math.cos(i * 1.05) * 13} ${Math.sin(i * 1.05) * 10 + 2}" stroke="${c}" stroke-width="2.6" stroke-linecap="round" fill="none"/>`).join('');
