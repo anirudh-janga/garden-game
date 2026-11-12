@@ -10,7 +10,7 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 
 > Keep this section up to date at the end of every working session. It is the hand-off point for the next session.
 
-**Current stories:** Milestone 9 (smooth everywhere) is finished: 9.1–9.5 are live (👀) and wait for review. On the iPhone the garden runs at 60 fps at both `q=7` and `q=0`, so the pixels are not the cost; the lowest tier had a missing depth buffer, now fixed. The measuring tools are in `tools/perf/`.
+**Current stories:** Two new milestones are planned and not started: **Milestone 11, one cozy cottage** (customisation removed; design in `docs/cottage-design.md`) and **Milestone 12, flowers of the world** (85 → 230 plants in nine regions of origin; plant list in `docs/flower-atlas.md`). Next story: **11.1**, unless the player asks for the flowers first (then 12.1). `HANDOFF.md` says how to pick the work up. Milestone 9 (9.1–9.5) and 10.1 are live (👀) and wait for review.
 **Preview URL:** https://anirudh-janga.github.io/garden-game/ (add `?season=spring|summer|autumn|winter` to preview other seasons)
 
 | Story | Status | Notes / feedback |
@@ -84,12 +84,34 @@ This backlog breaks the vision into **small, demoable stories**. Each one ends w
 | 9.4 Faster undo | 👀 Awaiting feedback | Undo still replays your strokes, but the replay is about 3x quicker: on your 274-stroke garden `rebuildInstantly` went from **~2.2 s to ~0.7–0.8 s** (software-rendered test browser; a phone will differ, and this is not yet a "blink"). Fixes: the cottage's walls are built once at the end instead of once per restyle replayed (~0.45 s), wildflower clearing along a path now looks only at nearby flowers (it scanned all 1,600 per step), the path's "inside another path" search runs only when a stone is due, and stones/flowers find their neighbours by a number key instead of a built string. Everything comes out the same: `worldfp` identical on both gardens, erase/undo/redo check passes, cottage restyles replay to the same walls and climbers. Undo-by-truncation was not attempted: flower strokes also clear wildflowers, so they can't be undone exactly without per-system snapshots. |
 | 9.5 Fewer draw calls | 👀 Awaiting feedback | Each flower species now has **3 shape variants instead of 5** (per-plant size, turn and colour still vary, so no two plants are alike, but there are fewer distinct petal/leaf shapes per species). On your garden, garden meshes (draw calls zoomed out) went **453 → 369**, and the whole-scene count at full zoom-out **590 → 506** (780 → 696 on a frame that redraws shadows). Every plant keeps its place, colour and count (`worldfp` totals identical on both gardens, erase/undo/redo and touch checks pass). Not done: merging pond chunks (they follow the terrain) and fewer stone shapes. If you miss the variety, `VARIANTS` in `flowers.ts` is one line. Not measured on a phone. |
 | 10.1 Tap a bed to look closely | 👀 Awaiting feedback | With the Look-around tool, tap a flower bed or a single flower: the camera glides in as close as the plants allow (about 2–6 m from the bit of bed you touched, low and near eye level) on the garden's own shapes. It is the same view, with no mode and no button: pinch to zoom out and you are back over the garden, drag to pan, and any touch stops the glide. Tapping empty ground does nothing. The camera can now also be pinched in that close by hand. Checked on your garden in the test browser (a land bed and a pond bed); not tried on a phone. |
+| 11.1 One cottage, no options | ⬜ Not started | Removes the cottage drawer and every option; old gardens still open. Design: `docs/cottage-design.md`. |
+| 11.2 The house itself: walls, roof and chimney | ⬜ Not started |  |
+| 11.3 Door, porch, windows and dormer | ⬜ Not started |  |
+| 11.4 Someone lives here | ⬜ Not started |  |
+| 11.5 Roses, wisteria, ivy and window boxes | ⬜ Not started |  |
+| 11.6 The cottage through the year | ⬜ Not started |  |
+| 11.7 Cottage proof and polish | ⬜ Not started |  |
+| 11.8 A cat lives here (optional) | ⬜ Not started | Only if the player wants it. |
+| 12.1 The flower atlas | ⬜ Not started | Files today's 85 plants under nine regions of origin and turns the flower book into an atlas. Plant list: `docs/flower-atlas.md`. |
+| 12.2 Room for 230 flowers | ⬜ Not started |  |
+| 12.3 Africa, part 1: the Cape's showpieces | ⬜ Not started | 11 plants. |
+| 12.4 Africa, part 2: bulbs and the tropics | ⬜ Not started | 8 plants. |
+| 12.5 Australia, New Zealand & the Pacific | ⬜ Not started | 18 plants. |
+| 12.6 East Asia | ⬜ Not started | 17 plants. |
+| 12.7 South & Southeast Asia | ⬜ Not started | 15 plants. |
+| 12.8 Mexico, Central America & the Caribbean | ⬜ Not started | 14 plants. |
+| 12.9 South America | ⬜ Not started | 16 plants. |
+| 12.10 North America | ⬜ Not started | 17 plants. |
+| 12.11 Mediterranean & Western Asia | ⬜ Not started | 15 plants. |
+| 12.12 Europe | ⬜ Not started | 14 plants. |
+| 12.13 Mixes of the world, and the last polish | ⬜ Not started |  |
 
 Status legend: ↩️ Reverted · ⬜ Not started · 🔨 In progress · 👀 Awaiting feedback · ✅ Done
 
 ### Feedback log
 _Feedback from each review, newest first, and what we changed because of it._
 
+- **One cottage, and flowers of the world (planning, 12 Nov 2026):** *Feedback:* "Can you design a proper cozy cottage, let's get rid of cottage customization completely. One cozy and extremely well designed one. Divide into a bunch of stories … I also want to massively expand the flower portfolio. Include varieties from all around the world, divide by place of origin. Create stories don't implement." *Changes:* nothing built. Wrote the cottage design (`docs/cottage-design.md`, with a front view) and the flower atlas (`docs/flower-atlas.md`: nine regions, 145 new plants, the new shapes they need), and added Milestones 11 (8 stories) and 12 (13 stories).
 - **Look closer at a bed (review 11):** *Feedback:* "when I tap on an existing flower bed, I want the best closeup I can, pinch on screen should work to go back .. no new view just focus on the bed or flower". *Changes:* story 10.1: tapping a bed or flower with Look around glides the camera in close on it (same view, same shapes; pinch out returns). The camera's nearest distance dropped from 9 m to 1.6 m with the camera sinking toward eye level.
 - **9.x review (iPhone test):** *Feedback:* both `?fps&q=7` and `?fps&q=0` ran at 60 fps; full resolution looks better; the low-resolution one had a bug (grey horizontal lines across the cottage, rocks on the roof, climbing roses missing). *Cause:* the lowest quality tier (no antialiasing) made the scene's render target without a depth buffer, so nothing hid what was behind it. *Changes:* the scene target always has a depth buffer (`post.ts`); checked with `tools/perf/closeshot.cjs`. *Result:* 60 fps at both settings means the pixels aren't the cost on the phone, so no lighter picture pipeline is needed.
 - **Make it smooth (Milestone 9):** *Feedback:* "Can you identify performance improvement paths that can make the gameplay super smooth and jank free", then "Yeah add stories and implement them one by one until all are done." *Changes:* measured the player's garden (numbers under Milestone 9) and added stories 9.1–9.5, built in order. Still unknown: how costly the pixels are on the iPhone itself (resolution, antialiasing, glow); the player can tell by comparing `?fps&q=7` with `?fps&q=0` on their garden.
@@ -791,6 +813,152 @@ Measured on the player's own garden (274 strokes, about 2,900 flower plants): zo
 
 ### Story 10.1 — Tap a bed to look closely (S)
 - Tap a bed or flower (Look around) and the camera glides in close on it; pinching out brings it back. No new view or buttons (the earlier close-up view, 7.3, was removed).
+
+## Milestone 11 — One cozy cottage *(requested by the player)*
+
+> "Can you design a proper cozy cottage, let's get rid of cottage customization completely. One cozy and extremely well designed one."
+
+**The design is `docs/cottage-design.md`** (with a front view in `docs/cottage-elevation.svg`): every size, colour and detail the stories below build is written there. Read it before starting any story in this milestone. One cottage, the same in every garden, with no options.
+
+**Checks for every story in this milestone** (as well as the Definition of Done):
+- Budgets from the design's section 8: near shape ≤ 32,000 triangles, far shape ≤ 5,000, ≤ 6 draw calls for the still house. Report the real numbers in the status row.
+- `tools/perf/shaders-run.sh` still builds at most 1 shader in the middle of play; `tools/perf/interact.cjs` passes; `worldfp.cjs` is identical on both gardens (the cottage isn't in it, but nothing else may move).
+- Pictures from `tools/perf/closeshot.cjs`, looked at before shipping: front, both sides, back, from above at full zoom-out, and close up at eye level. Send the player a before/after of the front.
+- The opening camera move (6.5) still starts on a good view of the front.
+
+### Story 11.1 — One cottage, no options (S)
+**As a** player, **I want** the cottage to simply be the cottage, **so that** there is nothing to fiddle with.
+- The cottage drawer and everything behind it are gone: `src/ui/cottagePanel.ts` and its styles, the option lists in `cottageStyle.ts`, `setCottageStyle`, the `cottage` action kind, and the rebuild machinery in `cottage.ts` (`setStyle`, `deferBuild`, `settle`, `stale`). Until 11.2 lands, the cottage is today's default look.
+- Gardens saved, backed up or shared with cottage changes still open exactly as before, minus the cottage's look: those entries are skipped on load (never an error), don't count as strokes for undo, and are dropped the next time the garden saves.
+- Tapping the cottage with Look around now glides the camera to a three-quarter view of its front (reuse `rig.focusOn` from 10.1; pinch out to come back). Check the camera's soft pan limit doesn't pull against the glide: the cottage stands about 16 m from the middle and the limit is 15 m when zoomed in.
+- Tools: delete `tools/perf/cottageundo.cjs`; remove the cottage-restyle step from `shaders.cjs`; in `interact.cjs`, replace the "cottage panel open" line (which has been failing) with a check that a tap on the cottage moves the camera toward it.
+- **Check:** if the player's garden had a restyled cottage, the `vines` lines of `worldfp` change (its climbers go); everything else must be identical. Save fresh baselines as `world-*-11.1.txt`.
+- **Try it:** tap the cottage. No drawer opens; the camera glides in to look at it. Pinch out to return.
+
+### Story 11.2 — The house itself: walls, roof and chimney (L)
+**As a** player, **I want** a cottage with real character in its shape, **so that** the back of my garden looks like somewhere someone lives.
+- Build the design's massing (section 2) and materials (section 4): the rubble plinth, the stone left gable with the chimney growing out of it (two shoulders, a capped shaft, two clay pots, smoke from the tall one), the oak frame with pillowed limewash panels on the other walls, the steep main roof (50°, a ridge that sags 10 cm, eaves that kick out, about 700 individual tiles each with its own tone, twist and drop, half-round ridge tiles, the odd slipped tile, one missing by the chimney, moss low on the back slope), and the lean-to wing (board walls, a single-slope tiled roof, the open bay with its two posts).
+- Openings in this story are simple but finished, in their final places and sizes (section 3): a plain plank door in the door's teal, and windows as glowing panes in oak frames. No porch, dormer, shutters or curtains yet (11.3).
+- Structure the code so later stories add parts without touching this one: a `src/world/cottage/` folder with `plan.ts` (every number from the design as a named constant, and the footprint rectangles), `kit.ts` (a builder that collects coloured geometry, and the hand-made helpers: a wandering timber, a rounded stone, a cupped tile, a pillowed panel, all seeded), then `walls.ts`, `roof.ts`, `chimney.ts`, `wing.ts`, and `index.ts` exporting the same `Cottage` members the world uses today (design section 9).
+- Everything still merges into **one vertex-coloured mesh** plus the glass. Parts that should look faceted (stones) and parts that should look smooth (tiles' cupping, timbers) get their normals before merging.
+- A far shape, swapped in beyond 40 m: one strip per tile course with per-tile colours, stones as bumpy walls.
+- `contains()` uses the new footprint rectangles (the wing and chimney are new ground): check paths, beds, fences, ponds, bunnies and the forest edge all still keep clear, and that plants can grow in the corner between the wing and the front wall.
+- Perches (ridge, chimney pots), night lights (one pool per window) and the smoke's origin move to the new shape.
+- Winter isn't made worse: a simple soft layer of snow on the roofs (the full winter dressing is 11.6).
+- **Try it:** look at the roof from far above, then tap the cottage and walk the camera round all four sides. Nothing should look straight, repeated or unfinished.
+
+### Story 11.3 — Door, porch, windows and dormer (M)
+**As a** player, **I want** the cottage's face to be welcoming, **so that** I want to walk up to it.
+- The porch (design section 2): flagstone floor and worn step, two oak posts on stone pads with curved braces, a collar beam, its own little tiled gable.
+- The front door in full (section 3): four uneven planks, an arched head, strap hinges, a ring handle, the small leaded light; ajar from spring to autumn, shut in winter.
+- All seven windows in full: bowed oak lintels, stone sills, deep reveals, soft-white frames with small panes, tied-back cream curtains just inside the glass, teal plank shutters with a cut-out heart, each hanging at its own slight angle. The parlour's left light stands open in summer.
+- The dormer over the parlour window, with timber cheeks and its own tiled roof (the main roof's tiles are cut round it; moss gathers beside it).
+- The round attic window in the right gable.
+- **Try it:** zoom in on the door and each window, by day and at night (the time dial). The windows should glow, and no two shutters should hang quite alike.
+
+### Story 11.4 — Someone lives here (M)
+**As a** player, **I want** signs of daily life round the door, **so that** the cottage feels lived in.
+- Everything in the design's section 5: the bench with its blanket, the lantern on the porch post (glowing at night), boots by the door (one fallen over), doormat and besom broom, watering can, the rain barrel with its spout and half-on lid, split logs stacked in the wing's open bay with a chopping block and axe, the hanging basket, the bird house under the gable, two milk bottles, the wheelbarrow and rope at the back, and an apron of irregular flagstones in front of the step.
+- The wind chimes (today's `ChimeSet`) hang under the porch eave, always.
+- A weather vane at the right end of the ridge: an iron arrow and a running hare. It turns to the wind's direction with a lazy lag and trembles in gusts (same wind as everything else). Birds can perch on it.
+- Each object is a small readable shape with its own slight irregularity; nothing floats or sinks into the ground on the sloping lawn.
+- **Try it:** tap the cottage and look for each thing. Watch the weather vane swing when the wind turns.
+
+### Story 11.5 — Roses, wisteria, ivy and window boxes (M)
+**As a** player, **I want** the cottage half-hidden in flowers, **so that** it belongs to the garden.
+- A blush-pink climbing rose up both porch posts and over the porch gable; wisteria from a gnarled trunk at the front right corner along under the eave to the dormer, hanging in racemes in late spring; ivy over the lower two thirds of the chimney and left gable (design section 6). These use the existing `Vines` system through `vinePaths()`, re-drawn for the new walls, and are always there.
+- Window boxes on the kitchen, parlour and dormer sills, and the hanging basket, planted by season: spring bulbs, summer geraniums and petunias trailing over the edge, autumn heather and small chrysanthemums, winter evergreen sprigs with red berries.
+- Climbers must not cover the windows, the door or the lantern, and must not cost more than today's cottage climbers did (measure the vines' triangles before and after).
+- **Try it:** look at the porch and the eave in each season (`?season=`). Bees and butterflies should find the roses.
+
+### Story 11.6 — The cottage through the year, by day and night (M)
+**As a** player, **I want** the cottage to change with the seasons and the hour, **so that** it always suits the garden round it.
+- Everything in the design's section 7. **Winter:** a soft rounded blanket of snow on every roof, thicker toward the eaves, melted bare round the chimney; snow caps on the dormer, porch, sills, bench, barrel and log pile; icicles of different lengths along the front eave; a wreath on the shut door; thicker smoke. **Autumn:** fallen leaves on the roof, caught behind the dormer and against the chimney; three pumpkins by the step; the log store full. **Spring and summer:** as built in 11.3–11.5.
+- **Rain:** roof and stone darken and take a sheen (the existing wetness). **Night:** windows and lantern bright, pools of light on the grass, a faint warm glow at the chimney pot.
+- **Try it:** `?season=winter`, then autumn, then turn the time dial to night in each.
+
+### Story 11.7 — Cottage proof and polish (S)
+- Look at the finished cottage at every distance and from every side, in four seasons, by day and at night, and fix what reads poorly (send the player the contact sheet).
+- Re-frame the opening camera move and the tap-to-look view for the new shape.
+- Final numbers against the budgets; remove any dead code and unused options; add a "Cottage" row to the technical decisions table.
+
+### Story 11.8 — A cat lives here (S) — *optional: only if the player wants it*
+- A ginger cat that sleeps on the bench in the sun (tail flicking now and then), sits on the parlour windowsill at dusk, and is a silhouette in the lit window at night.
+
+## Milestone 12 — Flowers of the world *(requested by the player)*
+
+> "I also want to massively expand the flower portfolio. Include varieties from all around the world, divide by place of origin."
+
+The collection grows from 85 plants to **230**, filed under nine regions of origin. **The plant list is `docs/flower-atlas.md`**: for every plant its name, botanical name, where it grows wild, when it blooms, its shape, height and colours, and the new shapes each region needs. Read it before starting any story here. The regional stories can be done in any order the player likes; they are listed with the most exotic first.
+
+**Checks for every regional story (12.3–12.12)**, as well as the Definition of Done:
+1. Every plant in that region's table is in the game, recognisable for what it is: right silhouette, right leaves, right way of carrying its flowers, right colours. A plant that would only be a recolour of one we have is not shipped as one: give it its own habit, or say in the status row that it was left out and why.
+2. `tools/perf/atlascheck.ts` (from 12.1) passes and the region's count matches the atlas.
+3. `tools/perf/shapebudget.ts` (from 12.2) passes: near shape ≤ 900 triangles (bush ≤ 1,400), far shape ≤ 250 (bush ≤ 400).
+4. Existing plants are untouched: `shapefp` hashes of every earlier species match the baseline, and `worldfp` is identical on both gardens. Then save a new shapes baseline that includes the new plants.
+5. Each new plant has a book and chip icon that reads as that plant, a sensible bud (out of season) and its own far shape.
+6. A picture sheet of the new plants close up in bloom (`tools/perf/plantsheet.cjs`, from 12.3), looked at one plant at a time before shipping, and sent to the player.
+7. `shaders-run.sh` still builds at most 1 shader mid-play; `interact.cjs` passes.
+8. If a region won't fit in one session, ship it in two halves, each complete. Never drop a plant silently.
+
+### Story 12.1 — The flower atlas: every flower has a home (M)
+**As a** player, **I want** to browse my flowers by where in the world they come from, **so that** I can plant a corner of Japan or a Cape hillside.
+- Every one of today's 85 plants gets its origin from the atlas (section 2): a region, its botanical name, and a short "native to" line.
+- The flower book opens on a contents page: **Blooming now** (today's view) and then the regions, each with an emblem flower, its name and "*n* flowers · *m* blooming now". Tapping a region opens its page: its flowers, those in bloom first, each card showing where it grows wild. One tap back to the contents. A region with no plants yet isn't shown.
+- Water plants and roses appear in their region's page (with their ripple badge and colour choice as today). The foliage book's cards show origins too.
+- When a flower is picked, the label above the toolbar says where it's from ("Tulip · Central Asia to Turkey").
+- No new plants and no shape changes in this story (`shapefp` and `worldfp` identical).
+- New check `tools/perf/atlascheck.ts`: every species has a valid region, a botanical name and a native range; prints the count per region.
+- **Try it:** open the flower book, go into East Asia, pick the peony, plant it.
+
+### Story 12.2 — Room for 230 flowers (M)
+**As a** player, **I want** the game to stay quick and the mix to stay pretty as the collection grows, **so that** more flowers never means more stutter.
+- **Shapes on demand.** Today every in-season shape is built ahead at load (`Flowers.wanted`); at 230 plants that is about three times the work and memory. Build ahead only what the saved garden uses, the chosen flower and the current mix; build the rest when picked, off the main thread. The first plant of a newly picked flower must not hitch: measure it.
+- **The seasonal mix stays a composition.** Measure how many species one mixed bed can end up with today (`makePlan` in `flowerBrush.ts`). Keep a bed to a handful (about six flower species) however large the collection, so it looks planted, not sprinkled, and so one bed never becomes dozens of draw calls.
+- **Real far shapes** for the four shape kinds whose far shape is nearly as heavy as the near one (`arch`, `cloud`, `pincushion`, `torch`: 96–100% today). Target ≤ 45%.
+- **A budget test**, `tools/perf/shapebudget.ts`: near and far triangles for every species and variant, failing over the atlas's budgets.
+- **The book stays quick:** a region's cards are made when the region is opened, not all 230 at start. Measure the time to open the book and a region.
+- **A world-tour test garden** (`GARDEN=tour` for the measuring tools): one clump of every species. Report its draw calls and triangles with `meshcount.cjs` now, and again as regions land.
+- **Visitors' favourites as data:** however butterflies, bees and hummingbirds choose favourite flowers today, make it a field on the species so new plants can join in.
+- **Try it:** nothing new to see. The garden, the book and the seasonal mix should feel exactly as quick as before.
+
+### Story 12.3 — Africa, part 1: the Cape's showpieces (L)
+King protea, pincushion, bird of paradise, calla lily, agapanthus, clivia, krantz aloe (a winter bloomer), Cape leadwort, gerbera, gazania, Cape daisy (atlas 4.1, part 1). **New shapes:** `bracts`, `spathe`, `crane`, the `bush` habit, trumpet florets for `cluster`, and leaf habits (strap, paddle, rosette, succulent, heart). Also builds `tools/perf/plantsheet.cjs`.
+- **Try it:** open Africa in the book. Plant a king protea, a bird of paradise and a drift of agapanthus.
+
+### Story 12.4 — Africa, part 2: bulbs and the tropics (M)
+Freesia, crocosmia, nerine, flame lily, African violet, busy Lizzie, Madagascar periwinkle, and the blue lily of the Nile for the pond (atlas 4.1, part 2). **New shapes:** `fan`, `spider`, the `starlily` water lily.
+
+### Story 12.5 — Australia, New Zealand & the Pacific (L)
+Kangaroo paw, waratah, banksia, bottlebrush, golden wattle, Sturt's desert pea, everlasting daisy, billy buttons, flannel flower, grevillea, Geraldton wax, Cooktown orchid, Swan River daisy, kōwhai, Mount Cook lily, hebe, pōhutukawa, tiare (atlas 4.2). **New shapes:** `brush`, `orchid`, and the `tube` and `pea` florets for `arch`.
+
+### Story 12.6 — East Asia (L)
+Camellia (winter into spring), azalea, Japanese iris for the pond's edge, red spider lily, balloon flower, astilbe, toad lily, cymbidium, Chinese lantern, flowering quince, tiger lily, candelabra primrose, Fuji cherry, spider chrysanthemum, gardenia, and two foliage plants: Hakone grass and Japanese painted fern (atlas 4.3). **New shapes:** `trumpet`, the `lantern` floret, and the `nod` and `spots` options.
+
+### Story 12.7 — South & Southeast Asia (L)
+Himalayan blue poppy, rhododendron, moth orchid, blue vanda, hibiscus, Arabian jasmine, torch ginger, ixora, cockscomb, white ginger lily, drumstick primula, cobra lily, Siam tulip, garden balsam, pagoda flower (atlas 4.4).
+
+### Story 12.8 — Mexico, Central America & the Caribbean (L)
+Poinsettia (autumn into winter), frangipani, Mexican sunflower, chocolate cosmos, tuberose, tiger flower, globe amaranth, lantana, Mexican bush sage, lobster claw, pride of Barbados, guaria morada, floss flower, canna (atlas 4.5).
+
+### Story 12.9 — South America (L)
+Passion flower, Peruvian lily, amaryllis (winter into spring), bougainvillea, angel's trumpet, tuberous begonia, anthurium, scarlet star, slipper flower, cantua, Chilean bellflower, marvel of Peru, scarlet sage, spider flower, moss rose, and the giant Amazon water lily for the pond (atlas 4.6). **New shapes:** the `fringe` option, the `pouch` floret, the `victoria` water lily.
+
+### Story 12.10 — North America (L)
+California poppy, Texas bluebonnet, Rocky Mountain columbine, trillium, bee balm, blazing star, butterfly weed, cardinal flower for the pond's edge, tickseed, penstemon, Virginia bluebells, showy lady's slipper, Indian paintbrush, Mexican hat, Adam's needle, mountain laurel, American lotus (atlas 4.7). **New shapes:** the `spurs` option.
+
+### Story 12.11 — Mediterranean & Western Asia (L)
+Crown imperial, oleander, love-in-a-mist, rock rose, foxtail lily, damask rose, Oriental poppy, poppy anemone, Madonna lily, bear's breeches, Persian lily, Siberian squill, candytuft, stock, statice (atlas 4.8). **New shapes:** `crown`.
+
+### Story 12.12 — Europe (M)
+Edelweiss, trumpet gentian, pasque flower, harebell, cowslip, snake's head fritillary, thrift, sea holly, autumn crocus, wood anemone, cottage pink, masterwort, lilac, sweet violet (atlas 4.9). **New shapes:** the `chequer` option.
+
+### Story 12.13 — Mixes of the world, and the last polish (M)
+**As a** player, **I want** to paint a whole region in one stroke, **so that** making a Japanese corner or a prairie is as easy as the seasonal mix.
+- A mix for each region on its page in the book (for example "Cape hillside", "Japanese garden", "Prairie", "Alpine meadow", "Tropics"): a planted composition of that region's flowers that are in bloom now, by height, like the seasonal mix.
+- The seasonal mix gives every region a fair turn.
+- Butterflies, bees and hummingbirds have favourites among the new flowers (hummingbirds at the tubes and trumpets, butterflies on butterfly weed and lantana).
+- Final numbers on the world-tour garden and the player's own garden; update the product principles and the technical decisions table (230 flowers, nine regions, the shape kinds).
 
 ## Parking lot (ideas to revisit)
 
