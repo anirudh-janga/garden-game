@@ -3,6 +3,7 @@ import { ORIGINS } from './flowerOrigins';
 import type { RegionKey } from './regions';
 import { AFRICA } from './species/africa';
 import { OCEANIA } from './species/oceania';
+import { EAST_ASIA } from './species/eastAsia';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
@@ -70,7 +71,7 @@ export type FlowerForm =
       size: number;
     }
   /** Arching stems hung with flowers: hearts (bleeding heart) or bells (Solomon's seal, fuchsia). */
-  | { kind: 'arch'; florets: number; floretSize: number; shape: 'heart' | 'bell' | 'tube' | 'pea' }
+  | { kind: 'arch'; florets: number; floretSize: number; shape: 'heart' | 'bell' | 'tube' | 'pea' | 'lantern' }
   /** An airy cloud of tiny florets on fine branching stems (baby's breath, lady's mantle). */
   | { kind: 'cloud'; florets: number; spread: number; floretSize: number }
   /** A pincushion head with a frill (scabious), or a spiky steel ball (globe thistle). */
@@ -105,6 +106,8 @@ export type FlowerForm =
   | { kind: 'brush'; style: 'cylinder' | 'candle' | 'dome' | 'comb' | 'plume' | 'spire' | 'flame'; length: number; radius: number; tip?: string; leaves?: LeafHabit }
   /** An arching spray of orchid blooms: moth (round and flat), cattleya (a frilled lip), star (narrow and pointed), slipper (a pouch). */
   | { kind: 'orchid'; type: 'moth' | 'cattleya' | 'star' | 'slipper'; flowers: number; size: number; lip: string; leaves?: LeafHabit }
+  /** One flaring funnel of joined petals on a stem: a hibiscus, amaryllis or lily (a long column of stamens if `column`), hanging (an angel's trumpet) or upright (a gentian). */
+  | { kind: 'trumpet'; length: number; flare: number; lobes: number; hang?: boolean; column?: string; leaves?: LeafHabit }
   /** A woody mound with its own leaves, carrying many small blooms (camellia, hibiscus, plumbago, oleander…). */
   | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'ferny'; leafColor?: string }
   | {
@@ -951,7 +954,7 @@ export const SPECIES: FlowerSpecies[] = BASE.map((sp) => {
   const o = ORIGINS[sp.id];
   if (!o && !(sp.region && sp.latin && sp.native)) throw new Error(`No origin for ${sp.id}`);
   return { ...sp, region: sp.region ?? o[0], latin: sp.latin ?? o[1], native: sp.native ?? o[2] } as FlowerSpecies;
-}).concat(AFRICA, OCEANIA);
+}).concat(AFRICA, OCEANIA, EAST_ASIA);
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';
