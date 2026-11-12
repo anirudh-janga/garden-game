@@ -55,7 +55,7 @@ box, so plants can grow in the corner between the wing and the front wall.
 | Opening | Where | What |
 |---|---|---|
 | **Front door** | x = −0.70, 0.86 × 1.85, under the porch | Four planks of uneven width, a shallow arched head, two long iron strap hinges, an iron ring handle, a 0.16 square leaded light at eye height. Painted duck-egg teal, weathered paler toward the bottom. It stands 4° ajar from spring to autumn, shut in winter. |
-| **Kitchen window** | Front, x = −1.95, 0.80 × 0.85, sill at y = 1.30 | Two-light casement, each light 2 × 3 small panes. |
+| **Kitchen window** | Front, x = −1.85, 0.80 × 0.85, sill at y = 1.30 | Two-light casement, each light 2 × 3 small panes. |
 | **Parlour window** | Front, x = +1.25, 1.45 × 0.95, sill at y = 1.20 | Three-light casement, each light 2 × 3 panes. The left light stands open 20° in summer. |
 | **Dormer window** | In the dormer | Two-light casement, 2 × 2 panes each. |
 | **Attic window** | Right gable, above the wing roof, y = 3.6 | Round, 0.45 across, a cross of glazing bars, a ring of oak. |
