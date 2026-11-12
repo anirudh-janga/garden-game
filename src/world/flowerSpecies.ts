@@ -1,4 +1,6 @@
 import type { Season } from './season';
+import { ORIGINS } from './flowerOrigins';
+import type { RegionKey } from './regions';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
@@ -80,7 +82,14 @@ export interface FlowerSpecies {
   spacing: number;
   /** Water plants: deep-water floaters, shallow-water marginals, or the damp bank. */
   zone?: 'deep' | 'shallow' | 'bank';
+  /** Where it comes from: the atlas region, its botanical name, and where it grows wild. */
+  region: RegionKey;
+  latin: string;
+  native: string;
 }
+
+/** A species as written out in a table below: its origin comes from `flowerOrigins.ts` (or is written on it). */
+type SpeciesBase = Omit<FlowerSpecies, 'region' | 'latin' | 'native'> & Partial<Pick<FlowerSpecies, 'region' | 'latin' | 'native'>>;
 
 /**
  * Rose colours, from classic red to white, with blends and bicolours written "base|edge"
@@ -105,7 +114,7 @@ const ROSE_COLOURS = [
   '#f6b48a|#f6ecd0', // peach fading to cream
 ];
 
-export const SPECIES: FlowerSpecies[] = [
+const BASE: SpeciesBase[] = [
   {
     id: 'aster',
     name: 'Aster',
@@ -887,6 +896,13 @@ export const SPECIES: FlowerSpecies[] = [
     spacing: 0.45,
   },
 ];
+
+/** Every plant, each with where it comes from. */
+export const SPECIES: FlowerSpecies[] = BASE.map((sp) => {
+  const o = ORIGINS[sp.id];
+  if (!o && !(sp.region && sp.latin && sp.native)) throw new Error(`No origin for ${sp.id}`);
+  return { ...sp, region: sp.region ?? o[0], latin: sp.latin ?? o[1], native: sp.native ?? o[2] } as FlowerSpecies;
+});
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';

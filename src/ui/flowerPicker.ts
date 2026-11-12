@@ -300,7 +300,8 @@ export class FlowerPicker {
     const where = id === WATER_MIX_ID || sp?.zone ? ' · paint across a pond' : '';
     // Settled, unless it has colours to choose from first (roses): then the swatch settles it.
     const settled = !this.colours.classList.contains('show');
-    const status = sp?.form.kind === 'foliage' ? label : this.blooming.has(id) || !sp ? `${label}: blooming now` : `${label}: buds until its season`;
+    const from = sp ? ` · ${sp.native}` : '';
+    const status = sp?.form.kind === 'foliage' ? `${label}${from}` : this.blooming.has(id) || !sp ? `${label}${from}: blooming now` : `${label}${from}: buds until its season`;
     this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : status + where, settled);
   }
 
