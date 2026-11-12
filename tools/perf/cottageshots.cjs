@@ -16,7 +16,7 @@ const OUT = process.env.OUT || '.';
   await page.evaluate(() => document.querySelectorAll('body > *:not(canvas)').forEach((e) => (e.style.display = 'none')));
   await page.waitForTimeout(4000);
   console.log('triangles', JSON.stringify(await w.evaluate(() => ({ ...cottage.triangles, buildMs: Math.round(cottage.buildMs) }))));
-  const views = (process.env.VIEWS || 'front,left,right,back,above,close,far').split(',');
+  const views = (process.env.VIEWS === '' ? [] : (process.env.VIEWS || 'front,left,right,back,above,close,far').split(','));
   const spec = {
     front: { d: 26, az: 0.35, y: 1.9, dy: 0 },
     left: { d: 26, az: -1.5, y: 1.9 },
@@ -26,15 +26,26 @@ const OUT = process.env.OUT || '.';
     close: { d: 12, az: 0.25, y: 1.5 },
     door: { d: 10, az: 0.1, y: 1.1 },
     porch: { d: 14, az: 0.0, y: 1.7 },
+    bench: { d: 11, az: 0.5, y: 0.8 },
+    wing: { d: 12, az: 0.9, y: 0.9 },
+    backclose: { d: 12, az: 3.4, y: 1.0 },
+    roofline: { d: 14, az: 1.2, y: 4.0 },
     far: { d: 60, az: 0.2, y: 0.6 },
   };
+  // AT="name:x,y,z,distance,azimuth;…": custom views looking at a point in the cottage's own coordinates.
+  for (const a of (process.env.AT || '').split(';').filter(Boolean)) {
+    const [name, rest] = a.split(':');
+    const [x, y, z, d, az] = rest.split(',').map(Number);
+    spec[name] = { at: [x, y, z], d, az, y: 0 };
+    views.push(name);
+  }
   for (const v of views) {
     const s = spec[v];
     await w.evaluate((s) => {
       const c = cottage.position;
       rig.freeSpots.push({ x: c.x, z: c.z, r: 10 });
       rig.minDistance = 4;
-      rig.target.set(c.x, s.y, c.z + 1);
+      if (s.at) { const p = cottage.group.localToWorld(new THREE.Vector3(...s.at)); rig.target.copy(p); } else rig.target.set(c.x, s.y, c.z + 1);
       rig.azimuth = cottage.frontAzimuth + s.az;
       rig.distance = s.d;
       rig.update(0);
