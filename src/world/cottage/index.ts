@@ -9,11 +9,12 @@ import { Smoke } from './smoke';
 import { Kit } from './kit';
 import { buildMainRoof, ridgeY } from './roof';
 import { buildDormer, buildPorch, mainRoofHole } from './face';
+import { buildDetails, WeatherVane } from './details';
 import type { Season } from '../season';
 import { buildChimney } from './chimney';
 import { buildWing } from './wing';
 import { buildPlinth, buildStoneGable, buildTimberWalls, type Glow } from './walls';
-import { COTTAGE_SCALE, EAVE_Y, EAVE_Z, FOOTPRINT, ROOF_X0, ROOF_X1 } from './plan';
+import { COTTAGE_SCALE, FOOTPRINT, PORCH, ROOF_X0, ROOF_X1 } from './plan';
 
 /** Beyond this distance (metres from the camera) the cottage is drawn in its far form. */
 const FAR_DETAIL = 40;
@@ -40,6 +41,7 @@ export class Cottage {
   private readonly yaw: number;
   private readonly snowy: boolean;
   private chimeSet: ChimeSet | null = null;
+  private readonly vane: WeatherVane;
   private readonly bodyMat: THREE.MeshLambertMaterial;
   private readonly glassMat: THREE.MeshLambertMaterial;
   private readonly body: THREE.Mesh;
@@ -88,6 +90,10 @@ export class Cottage {
     this.group.updateMatrixWorld(true);
     this.smoke.moveTo(this.group.localToWorld(near.smoke.clone()));
     this.hangChimes();
+    // The weather vane, at the ridge's right end.
+    const vx = ROOF_X1 - 0.5;
+    this.vane = new WeatherVane(V(vx, ridgeY(vx) + 0.08, 0), yaw);
+    this.group.add(this.vane.group);
   }
 
   /** The house as geometry: `far` is the lighter form. */
@@ -105,6 +111,7 @@ export class Cottage {
     buildMainRoof(main, rng, { far, snowy: this.snowy, skip: (x, u, side) => side === 1 && mainRoofHole(x, u) });
     buildPorch(kits, rng, this.snowy);
     buildDormer(kits, rng, this.snowy);
+    buildDetails(kits, rng);
     const smoke = buildChimney(main, rng, far);
     const body = main.geometry()!;
     const g = glass.geometry()!;
@@ -112,11 +119,10 @@ export class Cottage {
     return { body, glass: g, glow, smoke, triangles: main.triangles + glass.triangles };
   }
 
-  /** Wind chimes under the front eave, between the kitchen window and the door. */
+  /** Wind chimes hung from the porch's front beam. */
   private hangChimes() {
-    const x = -1.34;
     const set = new ChimeSet(this.seed + 9, (f, v, at) => this.onChime(f, v, at));
-    set.group.position.set(x, EAVE_Y - 0.12, EAVE_Z - 0.18);
+    set.group.position.set(PORCH.cx - 0.3, PORCH.beamY - 0.05, PORCH.postZ - 0.04);
     set.group.scale.setScalar(0.9);
     this.group.add(set.group);
     this.chimeSet = set;
@@ -175,8 +181,10 @@ export class Cottage {
 
   /** Places a bird could sit: along the roof ridge. */
   perches(out: Perch[]) {
-    for (let i = 0; i < 6; i++) {
-      const x = lerp(ROOF_X0 + 0.6, ROOF_X1 - 0.6, i / 5);
+    // The weather vane's mast (the top of its cross).
+    out.push({ pos: this.group.localToWorld(V(ROOF_X1 - 0.5, ridgeY(ROOF_X1 - 0.5) + 0.8, 0)), yaw: this.yaw, alive: () => true });
+    for (let i = 0; i < 5; i++) {
+      const x = lerp(ROOF_X0 + 0.6, ROOF_X1 - 1.1, i / 4);
       const pos = this.group.localToWorld(V(x, ridgeY(x) + 0.12, 0));
       out.push({ pos, yaw: this.yaw, alive: () => true });
     }
@@ -197,6 +205,7 @@ export class Cottage {
 
   update(dt: number, wind: WindField) {
     this.smoke.update(dt, wind);
+    this.vane.update(dt, wind.direction, wind.sample(this.position.x, this.position.z));
     this.chimeSet?.update(dt, wind.direction, wind.sample(this.position.x, this.position.z + 2));
   }
 

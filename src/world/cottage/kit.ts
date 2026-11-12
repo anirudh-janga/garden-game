@@ -163,6 +163,22 @@ export class Kit {
     this.block(p, color, { top: color.clone().offsetHSL(0, 0, 0.03) });
   }
 
+  /** An upright frustum (a barrel stave ring, a stump, a bottle): `sides` flat faces, radius r0 at the bottom and r1 at the top, with a top cap. */
+  prism(cx: number, cy: number, cz: number, r0: number, r1: number, h: number, sides: number, color: THREE.Color, opts: { top?: THREE.Color; yaw?: number; squash?: number } = {}) {
+    const yaw = opts.yaw ?? 0;
+    const sq = opts.squash ?? 1;
+    const ring = (r: number, y: number) => Array.from({ length: sides }, (_, i) => V(cx + Math.cos(yaw + (i / sides) * Math.PI * 2) * r, y, cz + Math.sin(yaw + (i / sides) * Math.PI * 2) * r * sq));
+    const a = ring(r0, cy);
+    const b = ring(r1, cy + h);
+    for (let i = 0; i < sides; i++) {
+      const j = (i + 1) % sides;
+      const m = yaw + ((i + 0.5) / sides) * Math.PI * 2;
+      this.quad(a[i], a[j], b[j], b[i], color, V(Math.cos(m), 0, Math.sin(m)));
+    }
+    const top = V(cx, cy + h, cz);
+    for (let i = 0; i < sides; i++) this.tri(b[i], b[(i + 1) % sides], top, opts.top ?? color, V(0, 1, 0));
+  }
+
   /** The geometry (position, normal and colour: flat shaded). Null if nothing was added. */
   geometry(): THREE.BufferGeometry | null {
     if (!this.pos.length) return null;
