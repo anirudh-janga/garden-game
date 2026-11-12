@@ -30,7 +30,7 @@ export class FlowerBook {
     private readonly species: FlowerSpecies[],
     private readonly season: Season,
     private readonly onPick: (id: string) => void,
-    private readonly mixes: { id: string; name: string; art: string; note: string }[] = [],
+    private readonly mixes: { id: string; name: string; art: string; note: string; region?: RegionKey }[] = [],
     private readonly atlas = false,
   ) {
     this.el = document.createElement('div');
@@ -134,13 +134,15 @@ export class FlowerBook {
     this.title.textContent = page === 'now' ? `Blooming now · ${SEASON_NAME[this.season]}` : region ? region.name : this.bookTitle;
     this.count.textContent = `${list.length} plants`;
     if (flat) this.mixesBlock();
+    else if (page !== 'now') this.mixesBlock(page);
     this.groups(list, page !== 'now');
   }
 
-  private mixesBlock() {
-    if (!this.mixes.length) return;
+  private mixesBlock(region?: RegionKey) {
+    const list = this.mixes.filter((m) => m.region === region);
+    if (!list.length) return;
     const grid = this.grid();
-    for (const m of this.mixes) {
+    for (const m of list) {
       grid.append(
         this.card(m.art, m.name, `<span class="book-colours">${m.note}</span>`, true, () => {
           this.onPick(m.id);
@@ -148,7 +150,7 @@ export class FlowerBook {
         }),
       );
     }
-    this.body.append(this.heading('Mixes'), grid);
+    this.body.append(this.heading(region ? 'Plant the whole region' : 'Mixes'), grid);
   }
 
   /** The plants of a page: "Blooming now" first (unless the page is that), then each later season in turn. */

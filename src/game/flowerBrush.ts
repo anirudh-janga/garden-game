@@ -4,7 +4,8 @@ import type { Ground } from '../world/ground';
 import type { Flowers, LeafKind } from '../world/flowers';
 import type { Wildflowers } from '../world/wildflowers';
 import type { Season } from '../world/season';
-import { MIX_ID, SPECIES, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
+import { SPECIES, type FlowerSpecies } from '../world/flowerSpecies';
+import { WORLD_MIX_ID, isFlowerMix, isWaterMix, mixSource } from '../world/mixes';
 import { seasonShift } from '../world/season';
 
 const DAB_STEP = 0.3; // metres between brush dabs along a stroke
@@ -73,7 +74,7 @@ const AMOUNT_CODE: Record<PlantAmount, string> = { drift: '', clump: 'c', one: '
 const FOOTPRINT: Record<PlantAmount, number | null> = { drift: null, clump: 0.5, one: 0.26 };
 
 export class FlowerBrush {
-  selected = MIX_ID;
+  selected = WORLD_MIX_ID;
   /** Drift (today's bed stroke), a clump, or a single flower placed exactly where the finger lifts. */
   amount: PlantAmount = 'drift';
   /** A clump or single flower went in at (x, z) (for its sound). */
@@ -267,10 +268,11 @@ export class FlowerBrush {
 
   private pickSpecies(): FlowerSpecies {
     const { id } = this.choice();
-    if (id !== MIX_ID) return SPECIES.find((s) => s.id === id) ?? SPECIES[0];
+    if (!isFlowerMix(id)) return SPECIES.find((s) => s.id === id) ?? SPECIES[0];
     // (Mixes are flowers: foliage is added by the bed plan, or picked on its own.)
-    const blooming = SPECIES.filter((s) => this.inSeason(s) && s.form.kind !== 'foliage');
-    const land = SPECIES.filter((s) => !s.zone && s.form.kind !== 'foliage');
+    const source = mixSource(id);
+    const blooming = source.filter((s) => this.inSeason(s) && s.form.kind !== 'foliage');
+    const land = source.filter((s) => !s.zone && s.form.kind !== 'foliage');
     const pool = blooming.filter((s) => !s.zone).length ? blooming.filter((s) => !s.zone) : land;
     return pool[Math.floor(this.rng() * pool.length)];
   }
@@ -278,11 +280,11 @@ export class FlowerBrush {
   /** A water flower for this spot of the pond (the chosen one if it grows here, or the water mix). */
   private pickWater(zone: 'deep' | 'shallow' | 'bank'): FlowerSpecies | null {
     const { id } = this.choice();
-    if (id !== WATER_MIX_ID && id !== MIX_ID) {
+    if (!isWaterMix(id) && !isFlowerMix(id)) {
       const sp = SPECIES.find((s) => s.id === id);
       return sp && sp.zone === zone ? sp : null;
     }
-    const here = SPECIES.filter((s) => s.zone === zone);
+    const here = mixSource(isWaterMix(id) ? id : id).filter((s) => s.zone === zone);
     const blooming = here.filter((s) => this.inSeason(s));
     const pool = blooming.length ? blooming : here;
     return pool.length ? pool[Math.floor(this.rng() * pool.length)] : null;
@@ -355,7 +357,7 @@ export class FlowerBrush {
       return;
     }
     const { id } = this.choice();
-    if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
+    if (isWaterMix(id) || SPECIES.find((s) => s.id === id)?.zone) return;
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.35) return;
     const reach = FOOTPRINT[this.amount]!;
     this.wildflowers.clearNear(c.x, c.y, reach);
@@ -414,13 +416,22 @@ export class FlowerBrush {
     const tall = (sp: FlowerSpecies) => sp.height[1] >= 0.75;
     const low = (sp: FlowerSpecies) => sp.height[1] <= 0.42;
     let tiers: BedPlan['tiers'];
-    if (id !== MIX_ID) {
+    if (!isFlowerMix(id)) {
       const sp = SPECIES.find((s) => s.id === id) ?? SPECIES[0];
       tiers = { tall: [sp], mid: [sp], low: [sp] };
     } else {
       const flower = (s: FlowerSpecies) => !s.zone && s.form.kind !== 'foliage';
-      const blooming = SPECIES.filter((s) => flower(s) && this.inSeason(s));
-      const pool = blooming.length >= 4 ? blooming : SPECIES.filter(flower);
+      let source = mixSource(id);
+      if (id === WORLD_MIX_ID) {
+        // The world mix gives every region a turn: this bed draws from one region that has enough in bloom.
+        const regions = [...new Set(source.filter((s) => flower(s) && this.inSeason(s)).map((s) => s.region))].filter((r) => source.filter((s) => s.region === r && flower(s) && this.inSeason(s)).length >= 4);
+        if (regions.length) {
+          const r = regions[Math.floor(this.rng() * regions.length)];
+          source = source.filter((s) => s.region === r);
+        }
+      }
+      const blooming = source.filter((s) => flower(s) && this.inSeason(s));
+      const pool = blooming.length >= 4 ? blooming : source.filter(flower);
       const themed = pool.filter((s) => s.colors.some((c) => fits(c, theme)));
       const from = themed.length >= 4 ? themed : pool;
       const pick = (list: FlowerSpecies[], n: number, fallback: FlowerSpecies[]) => {
@@ -506,7 +517,7 @@ export class FlowerBrush {
     }
     // Water flowers only grow in and by the water.
     const { id } = this.choice();
-    if (id === WATER_MIX_ID || SPECIES.find((s) => s.id === id)?.zone) return;
+    if (isWaterMix(id) || SPECIES.find((s) => s.id === id)?.zone) return;
     if (this.blocked(c.x, c.y) || this.distanceToPaths(c.x, c.y) < 0.52) return;
     // No soil and no edging: the plants grow straight up out of the lawn.
     const centre = c.clone();

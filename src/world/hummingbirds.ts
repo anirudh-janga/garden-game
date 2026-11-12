@@ -17,7 +17,11 @@ const KINDS = [
 ];
 
 /** Tubular, bright flowers they love most (others will do in a pinch). */
-const FAVOURITE: Record<string, number> = { salvia: 3, foxglove: 3, lavender: 1.5, tulip: 1, dahlia: 0.6, cosmos: 0.5, anemone: 0.5 };
+const FAVOURITE: Record<string, number> = {
+  salvia: 3, foxglove: 3, lavender: 1.5, tulip: 1, dahlia: 0.6, cosmos: 0.5, anemone: 0.5,
+  // The tubes and trumpets of the world (12.13).
+  fuchsia: 3, 'cardinal-flower': 3, 'bee-balm': 3, penstemon: 2.5, 'bush-sage': 2.5, hibiscus: 2, heliconia: 2, 'kangaroo-paw': 2, crocosmia: 2, columbine: 2, 'scarlet-sage': 2, 'red-hot-poker': 2, 'angels-trumpet': 1.5, agapanthus: 1, snapdragon: 1,
+};
 
 function paint(g: THREE.BufferGeometry, color: (x: number, y: number, z: number) => THREE.Color): THREE.BufferGeometry {
   const g2 = g.index ? g.toNonIndexed() : g;
