@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Cottage, DEFAULT_STYLE, decodeStyle, type CottageStyle } from '../world/cottage';
+import { Cottage } from '../world/cottage';
 import { SPECIES } from '../world/flowerSpecies';
 import { useSoftLight } from '../render/softLight';
 import { PALETTES, type Season } from '../world/season';
@@ -237,6 +237,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   // --- Camera: a diorama you hold in your hand ----------------------------------------------
   const camera = new THREE.PerspectiveCamera(30, 1, 0.3, 400);
   const rig = new CameraRig(camera, surface as unknown as HTMLElement);
+  rig.freeSpots.push({ x: cottage.position.x, z: cottage.position.z, r: 5 }); // (the view may rest at the cottage, past the pan limit)
 
   /** Distance at which the whole clearing fits the screen (the zoomed-out view). */
   function fitDistance(aspect: number): number {
@@ -342,7 +343,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     vines.removeOwner(-1, regrow.instant || regrow.offset > 0);
     for (const v of paths) vines.climb(v.points, { kind: v.kind, owner: -1, seed: v.seed, face: v.face, delay: 1.5, speed: v.kind === 'wisteria' ? 0.25 : 0.2 });
   };
-  cottage.onBuilt = growCottageVines;
   growCottageVines();
   const fenceBuilder = new FenceBuilder(
     fences,
@@ -807,13 +807,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     }
   };
 
-  /** Rebuild one saved action: a stroke, or a change to the cottage's look. */
-  function replayAction(a: Action) {
-    if (a.kind === 'cottage') cottage.setStyle(decodeStyle(a.style), !regrow.instant && regrow.offset === 0);
-    else controller.replay(a);
-  }
-
-  // --- The cottage: tap it to give it a new look (the page opens its drawer) -------------------
+  // --- The cottage: tap it (with Look around) to glide in and look at it ------------------------
   {
     // A tap (not a drag): on the cottage or not?
     const ray = new THREE.Raycaster();
@@ -825,9 +819,11 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || e.timeStamp - down.t > 450) return;
       ray.setFromCamera(new THREE.Vector2((e.clientX / screen.width) * 2 - 1, -(e.clientY / screen.height) * 2 + 1), camera);
       const onCottage = ray.intersectObject(cottage.group, true).length > 0;
-      link.call('cottageTap', onCottage);
-      // With the Look-around tool, a tap on a bed or a flower takes the camera in close on it.
-      if (!onCottage && rig.oneFingerPans) focusOnBed(ray.ray);
+      // With the Look-around tool, a tap on the cottage glides in to look at it, and a tap on a bed
+      // or a flower takes the camera in close on that.
+      if (!rig.oneFingerPans) return;
+      if (onCottage) focusOnCottage();
+      else focusOnBed(ray.ray);
     });
   }
   /**
@@ -864,15 +860,11 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     for (const p of near) extent = Math.max(extent, Math.hypot(p.x - cx, p.z - cz));
     rig.focusOn(new THREE.Vector3(cx, ground.heightAt(cx, cz) + 0.4, cz), extent * 2.3 + 1.8);
   }
-  const setCottageStyle = (style: CottageStyle) => {
-    cottage.setStyle(style);
-    // Anything growing where the cottage now reaches (a shed, a porch) steps aside.
-    wildflowers.clearIf((x, z) => cottage.contains(x, z, 0.2));
+  /** Glide to a three-quarter view of the cottage's front (pinch out to come back). */
+  function focusOnCottage() {
     const c = cottage.position;
-    for (let i = 0; i < 6; i++) dust.puff(new THREE.Vector3(c.x + (Math.random() - 0.5) * 5, c.y + 0.2, c.z + (Math.random() - 0.5) * 4), 2, 0.4);
-    ambience.bloom();
-    renderer.shadowMap.needsUpdate = true;
-  };
+    rig.focusOn(new THREE.Vector3(c.x, c.y + 2, c.z), 15, cottage.frontAzimuth + 0.45);
+  }
 
   // --- Undo / redo ---------------------------------------------------------------------------
   // The garden is its stroke list (kept by the page), so undoing is: put the garden back to
@@ -881,12 +873,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     regrow.instant = true;
     ambience.quiet = true;
     for (const s of [paint, stones, edgePlants, paths, flowers, flowerBrush, ponds, pondPlants, fish, pondBrush, wildflowers, fences, fenceBuilder, boulders, rockBrush, bridgeBuilder, props, vines]) s.reset();
-    // (Restyles replayed along the way only record the look: the walls are built once, at the end.)
-    cottage.deferBuild = true;
-    cottage.setStyle(DEFAULT_STYLE, false);
-    for (const a of actions) replayAction(a);
-    cottage.deferBuild = false;
-    cottage.settle();
+    for (const a of actions) controller.replay(a);
     // Mown this visit (or kept mown): the wildflowers stay mown through an undo.
     if (mownWild) wildflowers.clearIf(() => true);
     flowers.update(10);
@@ -915,7 +902,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     renderer.shadowMap.needsUpdate = true;
   }
   let actions: Action[] = [];
-  if (debug) Object.assign(globalThis, { rebuildInstantly: () => rebuildInstantly(actions), cottageStyle: () => cottage.style });
+  if (debug) Object.assign(globalThis, { rebuildInstantly: () => rebuildInstantly(actions) });
   /** Undone: rebuild without the last stroke, with a puff where it was. */
   const undo = (remaining: Action[], last: Action) => {
     actions = remaining;
@@ -928,7 +915,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   /** Redone: it plays out again, just as it was first made. */
   const redo = (next: Action) => {
     actions.push(next);
-    replayAction(next);
+    controller.replay(next);
   };
 
   // --- Post-processing ----------------------------------------------------------------------
@@ -1062,7 +1049,7 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         // A slice of strokes per frame, so the page's sprout keeps moving.
         while (next < saved.length && performance.now() - t0 < 12) {
           regrow.offset = 0.3 + next * gap;
-          replayAction(saved[next++]);
+          controller.replay(saved[next++]);
         }
         if (next < saved.length) setTimeout(step, 0);
         else done();
@@ -1241,7 +1228,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
         wildflowers.restoreIf((x, z) => !(cottage.contains(x, z, 0.4) || paths.distanceToPaths(x, z) < 0.8 || flowerBrush.distanceToBeds(x, z) < 0.15 || ponds.contains(x, z, 0.4)), creep);
       }
     },
-    setCottageStyle,
     undo,
     redo,
     setTime: applyTime,

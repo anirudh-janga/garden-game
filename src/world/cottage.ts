@@ -7,9 +7,6 @@ import { createRng, lerp } from '../core/random';
 import type { WindField } from '../render/wind';
 import type { SeasonPalette } from './season';
 import { ChimeSet } from './chimes';
-import { DOORS, ROOFS, SHUTTERS, WALLS, DEFAULT_STYLE, encodeStyle, type CottageStyle } from './cottageStyle';
-
-export * from './cottageStyle';
 
 const W = 4.6; // wall length (along local x)
 const D = 3.4; // wall depth (along local z)
@@ -18,21 +15,25 @@ const BASE_H = 0.45;
 const ROOF_RISE = 1.75;
 const COTTAGE_SCALE = 1.1;
 
+// The one cottage's palette (11.2 replaces this look with the full design in docs/cottage-design.md).
+const ROOF_COLOURS = { a: '#a65a41', b: '#8f4935' };
+const WALL_COLOUR = '#f1e3c8';
+const SHUTTER_COLOUR = '#6e9896';
+const DOOR_COLOUR = '#7c4f33';
+
 const lambert = (color: string, extra: THREE.MeshLambertMaterialParameters = {}) =>
   new THREE.MeshLambertMaterial({ color, ...extra });
 
 
 /**
- * A small storybook cottage, built from simple procedural pieces with hand-placed charm. Its
- * look comes from a CottageStyle, and it rebuilds itself (with a soft bounce) when that changes.
+ * A small storybook cottage, built from simple procedural pieces with hand-placed charm. There is
+ * one cottage and it is built once.
  */
 export class Cottage {
   readonly group = new THREE.Group();
-  style: CottageStyle = { ...DEFAULT_STYLE };
   private readonly smoke: Smoke;
   private readonly yaw: number;
   private readonly flowerTints: THREE.Color[];
-  private bounce = 1;
   private readonly snowy: boolean;
   private chimeSet: ChimeSet | null = null;
   private glassMat: THREE.MeshLambertMaterial | null = null;
@@ -59,64 +60,16 @@ export class Cottage {
     this.build();
   }
 
-  /**
-   * While set, a change of look only records the style (what the cottage covers, and where its
-   * climbers grow, follow from the style alone): `settle()` builds the walls once, at the end.
-   * An undo replays every restyle in turn, and building each look in between is wasted work.
-   */
-  deferBuild = false;
-  /** The look the walls on screen were built for. */
-  private builtKey = '';
-
-  /** Change the cottage's look; it rebuilds and gives a little bounce. */
-  setStyle(style: CottageStyle, animate = true) {
-    this.style = { ...style };
-    if (!this.deferBuild) this.settle();
-    this.onBuilt();
-    if (animate) this.bounce = 0;
-  }
-
-  /** Build the walls for the current style, unless they already are. */
-  settle() {
-    // (The same look again, as when an undo replays the garden: nothing to rebuild.)
-    if (this.group.children.length > 0 && encodeStyle(this.style) === this.builtKey) return;
-    this.build();
-  }
-
-  /**
-   * The last cottage's materials, let go only once the new one has been drawn: the new materials
-   * take over the same shaders then. (Let go at once, the shaders went with them and were
-   * compiled all over again for the new cottage: a hitch on every change of look.)
-   */
-  private stale: THREE.Material[] = [];
-  private staleFrames = 0;
-
   private build() {
-    this.staleFrames = 0;
-    this.builtKey = encodeStyle(this.style);
     const g = this.group;
-    // Clear out the old cottage (it's only ever a few hundred small meshes).
-    for (const child of [...g.children]) {
-      child.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          o.geometry.dispose();
-          // (Its material is let go a little later: see `stale`.)
-          this.stale.push(o.material as THREE.Material);
-        }
-      });
-      g.remove(child);
-    }
-    const st = this.style;
     const rng = createRng(this.seed);
-    const roofOpt = ROOFS[st.roof];
-    const wallOpt = WALLS[st.walls];
 
-    const plaster = lambert(wallOpt.c);
+    const plaster = lambert(WALL_COLOUR);
     const timber = lambert('#5e412d');
     const stone = lambert('#a29a8d');
-    const roof = lambert(roofOpt.a);
-    const roofDark = lambert(roofOpt.b);
-    const shutter = lambert(SHUTTERS[st.shutters].c);
+    const roof = lambert(ROOF_COLOURS.a);
+    const roofDark = lambert(ROOF_COLOURS.b);
+    const shutter = lambert(SHUTTER_COLOUR);
     // Windows glow (warmer and brighter on a snowy day).
     const glass = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: this.snowy ? 2.2 : 1.6 });
     this.glassMat = glass;
@@ -152,17 +105,9 @@ export class Cottage {
       g.add(c);
     }
 
-    // Walls (a stone cottage gets courses of stone drawn on in darker mortar lines).
+    // Walls.
     const wallY = BASE_H + WALL_H / 2;
     box(W, WALL_H, D, plaster, 0, wallY, 0);
-    if (wallOpt.stone) {
-      const mortar = lambert('#a39a8b');
-      for (let k = 1; k < 7; k++) {
-        const y = BASE_H + (k / 7) * WALL_H;
-        for (const sz of [-1, 1]) box(W + 0.01, 0.025, 0.02, mortar, 0, y, sz * (D / 2 + 0.005), g, false);
-        for (const sx of [-1, 1]) box(0.02, 0.025, D + 0.01, mortar, sx * (W / 2 + 0.005), y, 0, g, false);
-      }
-    }
 
     // Gable ends: a triangular prism spanning the width (ridge runs along x).
     const tri = new THREE.Shape();
@@ -179,9 +124,9 @@ export class Cottage {
     gable.receiveShadow = true;
     g.add(gable);
 
-    // Half-timbering: corner posts, sill and eave beams (not on a stone cottage's walls).
+    // Half-timbering: corner posts, sill and eave beams.
     const post = 0.16;
-    if (!wallOpt.stone) {
+    {
       for (const sx of [-1, 1]) {
         for (const sz of [-1, 1]) box(post, WALL_H, post, timber, sx * (W / 2), wallY, sz * (D / 2));
       }
@@ -192,21 +137,20 @@ export class Cottage {
       for (const sx of [-1, 1]) box(post, post, D + 0.05, timber, sx * (W / 2), BASE_H + WALL_H - 0.05, 0);
     }
 
-    // Roof: overlapping courses on each slope. Thatch is thicker, softer and shaggier.
-    const thatch = !!roofOpt.thatch;
+    // Roof: overlapping courses on each slope.
     const slopeLen = Math.hypot(D / 2 + 0.45, ROOF_RISE + 0.3);
     const pitch = Math.atan2(ROOF_RISE + 0.3, D / 2 + 0.45);
-    const courses = thatch ? 5 : 6;
+    const courses = 6;
     for (const side of [-1, 1]) {
       for (let k = 0; k < courses; k++) {
         const along = (k + 0.5) / courses; // 0 = eave, 1 = ridge
-        const geo = thatch ? new RoundedBoxGeometry(W + 0.9, 0.24, slopeLen / courses + 0.2, 2, 0.1) : new THREE.BoxGeometry(W + 0.8, 0.12, slopeLen / courses + 0.12);
+        const geo = new THREE.BoxGeometry(W + 0.8, 0.12, slopeLen / courses + 0.12);
         const mesh = new THREE.Mesh(geo, k % 2 === 0 ? roof : roofDark);
         const zEave = side * (D / 2 + 0.45);
         const yEave = BASE_H + WALL_H - 0.3;
         mesh.position.set(
           (rng() - 0.5) * 0.04,
-          yEave + Math.sin(pitch) * slopeLen * along + 0.06 * (courses - k) * 0.15 + (thatch ? 0.06 : 0),
+          yEave + Math.sin(pitch) * slopeLen * along + 0.06 * (courses - k) * 0.15,
           zEave - side * Math.cos(pitch) * slopeLen * along,
         );
         mesh.rotation.x = side * pitch;
@@ -217,8 +161,8 @@ export class Cottage {
         if (this.snowy && k > 0) {
           const snow = new THREE.Mesh(new RoundedBoxGeometry(W + 0.86 + (rng() - 0.5) * 0.05, 0.08, slopeLen / courses + 0.1, 2, 0.035), snowMat);
           snow.position.copy(mesh.position);
-          snow.position.y += (thatch ? 0.14 : 0.08) * Math.cos(pitch);
-          snow.position.z += side * (thatch ? 0.14 : 0.08) * Math.sin(pitch);
+          snow.position.y += 0.08 * Math.cos(pitch);
+          snow.position.z += side * 0.08 * Math.sin(pitch);
           snow.rotation.x = side * pitch;
           snow.scale.y = lerp(0.6, 1.1, along);
           snow.receiveShadow = true;
@@ -226,19 +170,11 @@ export class Cottage {
         }
       }
     }
-    if (thatch) {
-      const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, W + 0.95, 10), roofDark);
-      ridge.rotation.z = Math.PI / 2;
-      ridge.position.set(0, BASE_H + WALL_H + ROOF_RISE + 0.12, 0);
-      ridge.castShadow = true;
-      g.add(ridge);
-    } else {
-      box(W + 0.9, 0.16, 0.22, timber, 0, BASE_H + WALL_H + ROOF_RISE + 0.05, 0); // ridge
-    }
+    box(W + 0.9, 0.16, 0.22, timber, 0, BASE_H + WALL_H + ROOF_RISE + 0.05, 0); // ridge
 
     // Front (+z): a door and windows with shutters (and flower boxes, if it has them).
     const front = D / 2 + 0.03;
-    box(0.95, 1.7, 0.1, lambert(DOORS[st.door].c), -0.55, BASE_H + 0.85, front);
+    box(0.95, 1.7, 0.1, lambert(DOOR_COLOUR), -0.55, BASE_H + 0.85, front);
     box(1.15, 0.12, 0.14, timber, -0.55, BASE_H + 1.76, front);
     box(1.1, 0.12, 0.7, stone, -0.55, BASE_H - 0.12, front + 0.35); // doorstep
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), lambert('#d8b46a'));
@@ -273,31 +209,10 @@ export class Cottage {
       box(0.05, 0.85, 0.08, trim, 0, 0, 0.03, w);
       box(0.8, 0.05, 0.08, trim, 0, 0, 0.03, w);
       for (const sx of [-1, 1]) box(0.36, 0.9, 0.05, shutter, sx * 0.62, 0, 0.04, w);
-      if (withBox && st.boxes) flowerBox(w, 0.95, -0.6, 0.14);
+      if (withBox) flowerBox(w, 0.95, -0.6, 0.14);
       g.add(w);
     };
-    if (st.bay) {
-      // A bay window: a little three-sided glazed bump with its own lead roof.
-      const bay = new THREE.Group();
-      bay.position.set(1.15, BASE_H, front);
-      const bw = 1.3;
-      const bd = 0.55;
-      box(bw, 0.55, bd, plaster, 0, 0.35, bd / 2, bay);
-      box(bw - 0.12, 0.95, 0.05, glass, 0, 1.1, bd, bay);
-      this.glowSpots.push({ at: new THREE.Vector3(1.15, BASE_H + 1.1, front + bd), out: new THREE.Vector3(0, 0, 1), size: 1.3 });
-      for (const sx of [-1, 1]) box(0.05, 0.95, bd - 0.1, glass, sx * (bw / 2 - 0.02), 1.1, bd / 2, bay);
-      for (const sx of [-1, 0, 1]) box(0.06, 0.97, 0.07, trim, sx * (bw / 2 - 0.03), 1.1, bd + 0.01, bay);
-      box(bw + 0.12, 0.08, bd + 0.14, trim, 0, 0.62, bd / 2, bay);
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.2, 0.1, bd + 0.25), roofDark);
-      cap.position.set(0, 1.66, bd / 2 + 0.02);
-      cap.rotation.x = 0.28;
-      cap.castShadow = true;
-      bay.add(cap);
-      if (st.boxes) flowerBox(bay, bw - 0.1, 0.5, bd + 0.16);
-      g.add(bay);
-    } else {
-      windowAt(1.15, BASE_H + 1.25, front, 0, true);
-    }
+    windowAt(1.15, BASE_H + 1.25, front, 0, true);
     windowAt(-W / 2 - 0.03, BASE_H + 1.25, 0, -Math.PI / 2, true);
     windowAt(W / 2 + 0.03, BASE_H + 1.25, 0, Math.PI / 2, false);
     windowAt(0.9, BASE_H + 1.3, -front, Math.PI, false);
@@ -310,59 +225,14 @@ export class Cottage {
     this.setNight(this.night);
     g.add(lantern);
 
-    if (st.porch) {
-      // A little gabled porch over the door, on two white posts.
-      const px = -0.55;
-      const pd = 1.0;
-      for (const sx of [-1, 1]) box(0.09, 1.95, 0.09, trim, px + sx * 0.65, BASE_H + 0.95, front + pd);
-      box(1.5, 0.1, 0.1, trim, px, BASE_H + 1.97, front + pd);
-      for (const side of [-1, 1]) {
-        const slab = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, pd + 0.35), roof);
-        slab.position.set(px + side * 0.38, BASE_H + 2.2, front + pd / 2);
-        slab.rotation.z = -side * 0.62;
-        slab.castShadow = true;
-        g.add(slab);
-      }
-      box(1.6, 0.1, pd + 0.2, stone, px, BASE_H - 0.1, front + pd / 2 + 0.1);
-    }
-
     // Chimney through the right side of the roof: stone, brick, or white with a pot on top.
     const chimX = W / 2 - 0.75;
     const chimTop = BASE_H + WALL_H + ROOF_RISE + 0.75;
-    const chimMat = st.chimney === 1 ? lambert('#9a5440') : st.chimney === 2 ? lambert('#efe8dc') : stone;
-    box(0.62, chimTop - BASE_H - WALL_H + 0.2, 0.62, chimMat, chimX, (chimTop + BASE_H + WALL_H) / 2, -0.55);
-    if (st.chimney === 1) {
-      for (let k = 1; k < 6; k++) box(0.63, 0.02, 0.63, lambert('#7d4434'), chimX, BASE_H + WALL_H + ROOF_RISE * 0.6 + k * 0.17, -0.55, g, false);
-    }
-    box(0.74, 0.14, 0.74, lambert(st.chimney === 1 ? '#6f3a2c' : '#8d867b'), chimX, chimTop, -0.55);
-    let smokeY = chimTop + 0.1;
-    if (st.chimney === 2) {
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.32, 10), lambert('#b8643f'));
-      pot.position.set(chimX, chimTop + 0.22, -0.55);
-      pot.castShadow = true;
-      g.add(pot);
-      smokeY += 0.3;
-    }
+    box(0.62, chimTop - BASE_H - WALL_H + 0.2, 0.62, stone, chimX, (chimTop + BASE_H + WALL_H) / 2, -0.55);
+    box(0.74, 0.14, 0.74, lambert('#8d867b'), chimX, chimTop, -0.55);
+    const smokeY = chimTop + 0.1;
 
-    if (st.shed) {
-      // A lean-to shed on the right gable end: timber boards, a sloping roof, a little door.
-      const sh = new THREE.Group();
-      sh.position.set(W / 2 + 0.85, 0, 0.2);
-      const boards = lambert('#8a6a4a');
-      box(1.6, 1.75, 2.1, boards, 0, BASE_H + 0.8, 0, sh);
-      for (let k = 0; k < 8; k++) box(0.025, 1.7, 0.02, lambert('#6e5338'), -0.75 + k * 0.21, BASE_H + 0.8, 1.06, sh, false);
-      box(0.6, 1.35, 0.06, lambert(DOORS[st.door].c), 0.1, BASE_H + 0.62, 1.07, sh);
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.09, 2.45), roofDark);
-      lid.position.set(0, BASE_H + 1.85, 0);
-      lid.rotation.z = -0.3;
-      lid.castShadow = true;
-      sh.add(lid);
-      box(1.7, BASE_H, 2.2, stone, 0, BASE_H / 2 - 0.05, 0, sh);
-      g.add(sh);
-    }
-
-    this.chimeSet = null;
-    if (st.chimes) {
+    {
       // Wind chimes hung from a little iron bracket under the front eave, by the door.
       const bx = -W / 2 + 0.45;
       const by = BASE_H + WALL_H - 0.12;
@@ -465,39 +335,22 @@ export class Cottage {
     return this.smoke.points;
   }
 
-  /** Called after every (re)build, so climbers can be grown over the new walls. */
-  onBuilt: () => void = () => {};
-
   /**
-   * Where climbers grow on this cottage (world points, from the root): climbing roses up the
-   * front corners and round the door, wisteria up a corner and along under the front eave.
+   * Where climbers grow on this cottage (world points, from the root). None yet: the climbing
+   * roses and wisteria are drawn for the new walls in story 11.5.
    */
   vinePaths(): { kind: 'rose' | 'wisteria'; points: THREE.Vector3[]; face: THREE.Vector3; seed: number }[] {
-    const st = this.style;
-    const out: { kind: 'rose' | 'wisteria'; points: THREE.Vector3[]; face: THREE.Vector3; seed: number }[] = [];
-    const front = D / 2 + 0.06;
-    const face = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
-    // (By hand rather than from the group's matrix, which may be mid-bounce.)
-    const world = (pts: [number, number, number][]) => pts.map(([x, y, z]) => new THREE.Vector3(x, y, z).multiplyScalar(COTTAGE_SCALE).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw).add(this.position));
-    const eave = BASE_H + WALL_H - 0.12;
-    if (st.roses) {
-      // Up beside the door and over it, and up the left front corner.
-      out.push({ kind: 'rose', face, seed: this.seed + 101, points: world([[-0.75, 0.05, front], [-0.7, 0.9, front], [-0.68, 1.75, front], [-0.4, 2.05, front], [0.05, 2.1, front], [0.35, 1.95, front]]) });
-      out.push({ kind: 'rose', face, seed: this.seed + 102, points: world([[0.42, 0.05, front], [0.4, 1.0, front], [0.38, 1.6, front]]) });
-      out.push({ kind: 'rose', face, seed: this.seed + 103, points: world([[-W / 2 + 0.12, 0.05, front], [-W / 2 + 0.15, 1.2, front], [-W / 2 + 0.2, eave, front], [-W / 2 + 0.9, eave + 0.02, front]]) });
-    }
-    if (st.wisteria) {
-      // A gnarled trunk up the right corner, then a long arm under the eave, racemes hanging.
-      const x0 = W / 2 - 0.14;
-      const arm = eave - 0.22; // low enough that the flowers hang below the eave
-      out.push({ kind: 'wisteria', face, seed: this.seed + 111, points: world([[x0, 0.05, front], [x0 - 0.04, 0.8, front], [x0 + 0.02, 1.6, front], [x0 - 0.05, arm, front], [x0 - 1.2, arm + 0.04, front], [x0 - 2.4, arm - 0.03, front], [x0 - 3.4, arm + 0.03, front], [-W / 2 + 0.2, arm, front]]) });
-    }
-    return out;
+    return [];
+  }
+
+  /** The camera turn (azimuth) that looks at the front of the cottage head on. */
+  get frontAzimuth(): number {
+    return this.yaw;
   }
 
   /** Places a bird could sit along the roof ridge. */
   perches(out: Perch[]) {
-    const top = BASE_H + WALL_H + ROOF_RISE + (ROOFS[this.style.roof]?.thatch ? 0.33 : 0.13);
+    const top = BASE_H + WALL_H + ROOF_RISE + 0.13;
     for (let i = 0; i < 5; i++) {
       const pos = this.group.localToWorld(new THREE.Vector3(lerp(-W / 2 + 0.2, W / 2 - 0.2, i / 4), top, 0));
       out.push({ pos, yaw: this.yaw, alive: () => true });
@@ -530,25 +383,14 @@ export class Cottage {
     const lx = (dx * c + dz * s) / COTTAGE_SCALE;
     const lz = (-dx * s + dz * c) / COTTAGE_SCALE;
     const m = margin / COTTAGE_SCALE;
-    const right = W / 2 + 0.5 + (this.style.shed ? 1.7 : 0);
-    const frontEdge = D / 2 + 0.5 + (this.style.porch ? 0.9 : 0);
+    const right = W / 2 + 0.5;
+    const frontEdge = D / 2 + 0.5;
     return lx > -(W / 2 + 0.5) - m && lx < right + m && lz > -(D / 2 + 0.5) - m && lz < frontEdge + m;
   }
 
   update(dt: number, wind: WindField) {
-    if (this.stale.length && ++this.staleFrames > 3) {
-      for (const m of this.stale) m.dispose();
-      this.stale = [];
-    }
     this.smoke.update(dt, wind);
     this.chimeSet?.update(dt, wind.direction, wind.sample(this.position.x, this.position.z + 2));
-    if (this.bounce < 1) {
-      // A happy little bounce when it's been given a new look.
-      this.bounce = Math.min(1, this.bounce + dt / 0.7);
-      const t = this.bounce;
-      const k = Math.exp(-t * 6) * Math.sin(t * 22) * 0.05;
-      this.group.scale.set(COTTAGE_SCALE * (1 - k * 0.5), COTTAGE_SCALE * (1 + k), COTTAGE_SCALE * (1 - k * 0.5));
-    }
   }
 
   setPixelRatio(pr: number) {

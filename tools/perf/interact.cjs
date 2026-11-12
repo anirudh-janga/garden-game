@@ -42,11 +42,16 @@ const mode = process.env.MODE || '';
   await page.evaluate(() => document.querySelector('.redo-toggle').click());
   await page.waitForTimeout(1500);
   console.log('after redo: actions', await actions());
-  // 5) cottage tap (Look around tool)
+  // 5) cottage tap (Look around tool): the camera glides in on the cottage
   await tool('move');
+  await ev(() => { rig.distance = 30; rig.azimuth = 0; rig.target.set(cottage.position.x, 0.6, cottage.position.z + 6); rig.update(0); });
+  await page.waitForTimeout(800);
   const c = await ev(() => { const p = cottage.position.clone(); p.y += 2; p.project(camera); return { x: (p.x + 1) / 2 * 390, y: (1 - p.y) / 2 * 844 }; });
-  await touch('touchStart', [[c.x, c.y]]); await page.waitForTimeout(80); await touch('touchEnd', []); await page.waitForTimeout(800);
-  console.log('cottage panel open', await page.evaluate(() => !!document.querySelector('.cottage-panel.show')));
+  const d0c = await ev(() => rig.distance);
+  await touch('touchStart', [[c.x, c.y]]); await page.waitForTimeout(80); await touch('touchEnd', []); await page.waitForTimeout(300);
+  await ev(() => { for (let k = 0; k < 120; k++) rig.update(1 / 60); });
+  const near = await ev(() => ({ d: rig.distance, off: Math.hypot(rig.target.x - cottage.position.x, rig.target.z - cottage.position.z) }));
+  console.log('cottage tap glides in', near.d < d0c && near.off < 1.5, JSON.stringify(near));
   // 6) admire
   await page.tap('.admire-toggle'); await page.waitForTimeout(2500);
   const a0 = await ev(() => rig.azimuth); await page.waitForTimeout(3000); const a1 = await ev(() => rig.azimuth);

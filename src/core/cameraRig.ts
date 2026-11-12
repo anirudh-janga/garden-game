@@ -17,6 +17,8 @@ export class CameraRig {
   maxDistance = 45;
   /** How far the view centre may wander from the middle of the clearing. */
   panLimit = 15;
+  /** Places the view centre may rest beyond that limit (x, z, radius): the cottage, at the back. */
+  readonly freeSpots: { x: number; z: number; r: number }[] = [];
 
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private velPan = new THREE.Vector2();
@@ -26,7 +28,7 @@ export class CameraRig {
   private lastAngle = 0;
   private lastMid = new THREE.Vector2();
   /** A glide to a place of interest (see `focusOn`): any touch lets go of it. */
-  private glide: { target: THREE.Vector3; distance: number } | null = null;
+  private glide: { target: THREE.Vector3; distance: number; azimuth?: number } | null = null;
   /** Set by the toolbar later: when false, one finger is free for building. */
   oneFingerPans = true;
 
@@ -48,8 +50,8 @@ export class CameraRig {
    * Glide in on a spot (a bed, a flower) to `distance` metres from it. It is still the same
    * view: pinch out and the camera comes back up to the garden, drag and it follows your finger.
    */
-  focusOn(target: THREE.Vector3, distance: number) {
-    this.glide = { target: target.clone(), distance: clamp(distance, this.closeDistance, this.maxDistance) };
+  focusOn(target: THREE.Vector3, distance: number, azimuth?: number) {
+    this.glide = { target: target.clone(), distance: clamp(distance, this.closeDistance, this.maxDistance), azimuth };
     this.velPan.set(0, 0);
     this.velZoom = 0;
     this.velRot = 0;
@@ -154,7 +156,15 @@ export class CameraRig {
       this.target.lerp(this.glide.target, k);
       const logD = lerp(Math.log(this.distance), Math.log(this.glide.distance), k);
       this.distance = Math.exp(logD);
-      if (this.target.distanceTo(this.glide.target) < 0.02 && Math.abs(logD - Math.log(this.glide.distance)) < 0.01) this.glide = null;
+      let turned = true;
+      if (this.glide.azimuth !== undefined) {
+        // Turn the short way round.
+        let d = this.glide.azimuth - this.azimuth;
+        d -= Math.round(d / (Math.PI * 2)) * Math.PI * 2;
+        this.azimuth += d * k;
+        turned = Math.abs(d) < 0.01;
+      }
+      if (turned && this.target.distanceTo(this.glide.target) < 0.02 && Math.abs(logD - Math.log(this.glide.distance)) < 0.01) this.glide = null;
     } else if (this.distance > this.minDistance) {
       // Back up in the garden, the view centre settles to its usual height again.
       this.target.y += (0.6 - this.target.y) * (1 - Math.exp(-dt * 3));
@@ -173,7 +183,8 @@ export class CameraRig {
     // Soft pan limit: allowed radius grows as you zoom in, gently pulled back when exceeded.
     const limit = this.panLimit * lerp(1, 0.25, smoothstep(this.minDistance, this.maxDistance, this.distance));
     const off = new THREE.Vector2(this.target.x, this.target.z + 1.2);
-    if (off.length() > limit) {
+    const free = this.freeSpots.some((f) => Math.hypot(this.target.x - f.x, this.target.z - f.z) < f.r);
+    if (!free && off.length() > limit) {
       off.multiplyScalar(lerp(1, limit / off.length(), 1 - Math.exp(-dt * 8)));
       this.target.x = off.x;
       this.target.z = off.y - 1.2;
