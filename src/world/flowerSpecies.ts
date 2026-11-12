@@ -1,11 +1,23 @@
 import type { Season } from './season';
 import { ORIGINS } from './flowerOrigins';
 import type { RegionKey } from './regions';
+import { AFRICA } from './species/africa';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
  * recipe for a procedural flower with its own silhouette; every planted flower varies within it.
  */
+/** How a plant's leaves are drawn (see `exotic.ts`). */
+export type LeafHabit = 'strap' | 'paddle' | 'sword' | 'rosette' | 'feathery' | 'heart' | 'succulent' | 'leathery' | 'none';
+
+/** A small bloom of a bush: a ring of petals, a trumpet, a cup, or a ball (camellia's double). */
+export interface SmallBloom {
+  type: 'radial' | 'trumpet' | 'cup' | 'pom';
+  petals?: number;
+  size: number;
+  centre?: string;
+}
+
 export interface RadialForm {
   kind: 'radial';
   petals: [number, number];
@@ -32,6 +44,8 @@ export interface RadialForm {
   stamens?: string;
   /** A trumpet in the middle, as long as this fraction of a petal (daffodil). */
   corona?: { color: string; length: number };
+  /** Leaves at the foot of the plant, beyond the stem's own (a gerbera's rosette). */
+  leaves?: LeafHabit;
 }
 
 export type FlowerForm =
@@ -58,9 +72,29 @@ export type FlowerForm =
   /** A pincushion head with a frill (scabious), or a spiky steel ball (globe thistle). */
   | { kind: 'pincushion'; size: number; spiky: boolean }
   /** A dense torch of drooping tubes, shading from the base colour up to the edge colour (red hot poker). */
-  | { kind: 'torch'; length: number; radius: number }
+  | { kind: 'torch'; length: number; radius: number; leaves?: LeafHabit }
   /** A foliage plant (grass, fern, hosta, heuchera, lamb's ear, box), tinted by its colour. */
   | { kind: 'foliage'; leaf: 'grass' | 'fern' | 'hosta' | 'silver' | 'box' }
+  /** Stiff pointed bracts round a centre: a protea's bowl, a poinsettia's star, an edelweiss's woolly star, a torch ginger's cone. */
+  | {
+      kind: 'bracts';
+      style: 'bowl' | 'star' | 'cone' | 'ruff';
+      rows: number;
+      /** Bracts in the outer row. */
+      per: number;
+      length: number;
+      width: number;
+      /** Radians from vertical: low is a closed cone, high a flat star. */
+      open: number;
+      centre: { kind: 'dome' | 'woolly' | 'cone' | 'beads' | 'pins' | 'none'; size: number; color?: string };
+      leaves?: LeafHabit;
+    }
+  /** One sheath round a spadix: a funnel (calla), a flat glossy heart (anthurium), a striped hood (cobra lily). */
+  | { kind: 'spathe'; style: 'funnel' | 'flat' | 'hood'; size: number; spadix: string; leaves?: LeafHabit }
+  /** Boat-shaped bracts: a beak with a fan of sepals and a blue tongue (bird of paradise), or a zigzag ladder of beaks (heliconia). */
+  | { kind: 'crane'; style: 'bird' | 'zigzag'; size: number; leaves?: LeafHabit }
+  /** A woody mound with its own leaves, carrying many small blooms (camellia, hibiscus, plumbago, oleander…). */
+  | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'ferny'; leafColor?: string }
   | {
       kind: 'cluster';
       florets: number;
@@ -68,6 +102,9 @@ export type FlowerForm =
       floretSize: number;
       /** Flat-topped (sedum, yarrow), a domed mophead (hydrangea, geranium), or a ball on a bare stem (allium). */
       shape?: 'flat' | 'dome' | 'globe';
+      /** The florets are little trumpets (agapanthus, clivia) rather than stars. */
+      floret?: 'trumpet';
+      leaves?: LeafHabit;
     };
 
 export interface FlowerSpecies {
@@ -902,7 +939,7 @@ export const SPECIES: FlowerSpecies[] = BASE.map((sp) => {
   const o = ORIGINS[sp.id];
   if (!o && !(sp.region && sp.latin && sp.native)) throw new Error(`No origin for ${sp.id}`);
   return { ...sp, region: sp.region ?? o[0], latin: sp.latin ?? o[1], native: sp.native ?? o[2] } as FlowerSpecies;
-});
+}).concat(AFRICA);
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';

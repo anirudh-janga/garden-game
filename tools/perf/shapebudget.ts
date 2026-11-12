@@ -15,7 +15,7 @@ let farAll = 0;
 const t0 = Date.now();
 const rows: string[] = [];
 for (const sp of SPECIES) {
-  const bush = sp.form.kind === 'rose' || (sp.form as any).bush;
+  const bush = sp.form.kind === 'rose' || sp.form.kind === 'bush';
   const nearMax = bush ? 1400 : 900;
   const farMax = bush ? 400 : 250;
   let n = 0;
