@@ -9,6 +9,7 @@ import { MEXICO } from './species/mexico';
 import { SOUTH_AMERICA } from './species/southAmerica';
 import { NORTH_AMERICA } from './species/northAmerica';
 import { MEDITERRANEAN } from './species/mediterranean';
+import { EUROPE } from './species/europe';
 
 /**
  * The flower collection. Flowers only: no vegetables or utility plants. Each species is a
@@ -965,7 +966,7 @@ export const SPECIES: FlowerSpecies[] = BASE.map((sp) => {
   const o = ORIGINS[sp.id];
   if (!o && !(sp.region && sp.latin && sp.native)) throw new Error(`No origin for ${sp.id}`);
   return { ...sp, region: sp.region ?? o[0], latin: sp.latin ?? o[1], native: sp.native ?? o[2] } as FlowerSpecies;
-}).concat(AFRICA, OCEANIA, EAST_ASIA, SOUTH_ASIA, MEXICO, SOUTH_AMERICA, NORTH_AMERICA, MEDITERRANEAN);
+}).concat(AFRICA, OCEANIA, EAST_ASIA, SOUTH_ASIA, MEXICO, SOUTH_AMERICA, NORTH_AMERICA, MEDITERRANEAN, EUROPE);
 
 /** "Seasonal mix": the species in bloom now, mixed together. */
 export const MIX_ID = 'mix';
