@@ -1,4 +1,5 @@
-import { MIX_ID, WATER_MIX_ID, type FlowerSpecies } from '../world/flowerSpecies';
+import type { FlowerSpecies } from '../world/flowerSpecies';
+import { WORLD_MIX_ID, isAnyMix, isWaterMix, mixName } from '../world/mixes';
 
 /** A small illustrated flower icon for a species chip (inline SVG, 40×40). */
 export function icon(sp: FlowerSpecies | null, water = false): string {
@@ -296,16 +297,16 @@ export class FlowerPicker {
     this.coloursBar.append(this.colours);
     document.body.append(this.coloursBar);
     document.body.append(this.el);
-    this.select(MIX_ID);
+    this.select(WORLD_MIX_ID);
   }
 
   /** The book chips: the chosen plant's picture and name on its book, the other book plain. */
   private select(id: string) {
     const sp = this.species.find((s) => s.id === id);
     const leafy = sp?.form.kind === 'foliage';
-    const name = sp?.name ?? (id === WATER_MIX_ID ? 'Water mix' : 'Seasonal mix');
+    const name = sp?.name ?? mixName(id);
     const face = (svg: string, label: string) => `<span class="chip-face">${svg}</span><span class="chip-name">${label}</span>`;
-    this.flowerChip.innerHTML = leafy ? face(BOOK_ICON, 'Flower book') : face(icon(sp ?? null, id === WATER_MIX_ID), name);
+    this.flowerChip.innerHTML = leafy ? face(BOOK_ICON, 'Flower book') : face(icon(sp ?? null, isWaterMix(id)), name);
     this.leafChip.innerHTML = leafy ? face(icon(sp!), name) : face(LEAF_BOOK_ICON, 'Foliage book');
     this.flowerChip.classList.toggle('active', !leafy);
     this.leafChip.classList.toggle('active', leafy);
@@ -351,17 +352,17 @@ export class FlowerPicker {
 
   pick(id: string) {
     const sp = this.species.find((s) => s.id === id);
-    const label = sp?.name ?? (id === WATER_MIX_ID ? 'Water mix' : 'Seasonal mix');
+    const label = sp?.name ?? mixName(id);
     this.select(id);
     this.showColours(sp);
     // Keep the colour chosen for this species last time.
     const colour = sp ? (this.colour.get(sp.id) ?? -1) : -1;
-    const where = id === WATER_MIX_ID || sp?.zone ? ' · paint across a pond' : '';
+    const where = isWaterMix(id) || sp?.zone ? ' · paint across a pond' : '';
     // Settled, unless it has colours to choose from first (roses): then the swatch settles it.
     const settled = !this.colours.classList.contains('show');
     const from = sp ? ` · ${sp.native}` : '';
-    const status = sp?.form.kind === 'foliage' ? `${label}${from}` : this.blooming.has(id) || !sp ? `${label}${from}: blooming now` : `${label}${from}: buds until its season`;
-    this.onPick(colour >= 0 ? `${id}:${colour}` : id, id === WATER_MIX_ID ? `Water mix${where}` : status + where, settled);
+    const status = sp?.form.kind === 'foliage' ? `${label}${from}` : this.blooming.has(id) || isAnyMix(id) ? `${label}${from}: blooming now` : `${label}${from}: buds until its season`;
+    this.onPick(colour >= 0 ? `${id}:${colour}` : id, isWaterMix(id) ? `Water mix${where}` : status + where, settled);
   }
 
   setVisible(v: boolean) {

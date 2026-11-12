@@ -371,7 +371,7 @@ const KINDS: Kind[] = [
   },
 ];
 
-const FAVOURITES = new Set(['lavender', 'salvia', 'sedum', 'cosmos', 'aster']);
+const FAVOURITES = new Set(['lavender', 'salvia', 'sedum', 'cosmos', 'aster', 'butterfly-weed', 'lantana', 'bee-balm', 'blazing-star', 'globe-amaranth', 'ageratum', 'statice', 'coreopsis']);
 
 /** One canvas holding every kind's wing (upper side left, underside right), a row each. */
 function atlas(): THREE.CanvasTexture {

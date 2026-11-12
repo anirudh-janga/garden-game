@@ -4,7 +4,9 @@ import { clearAddress, linkFor, packGarden, sharedInAddress, unpackGarden } from
 import { mountVisitBanner } from './ui/visitBanner';
 import { mountAdmire } from './ui/admire';
 import { mountTimeDial } from './ui/timeDial';
-import { MIX_ID, SPECIES, WATER_MIX_ID, type FlowerSpecies } from './world/flowerSpecies';
+import { SPECIES, type FlowerSpecies } from './world/flowerSpecies';
+import { REGION_MIXES, WORLD_MIX_ID, WORLD_WATER_ID, regionMixId } from './world/mixes';
+import { REGIONS } from './world/regions';
 import { FlowerBook } from './ui/flowerBook';
 import { FlowerPicker, icon } from './ui/flowerPicker';
 import { ChipPicker, BUILD_CHIPS, DECOR_CHIPS, TidyPicker } from './ui/stylePicker';
@@ -208,8 +210,13 @@ picker.onAmount = () => {
 };
 // The flower book: every species to browse, blooming-now first.
 const flowerBook = new FlowerBook('Flower book', SPECIES.filter((s) => s.form.kind !== 'foliage'), season, (id) => picker.pick(id), [
-  { id: MIX_ID, name: 'Seasonal mix', art: icon(null), note: 'what’s blooming' },
-  { id: WATER_MIX_ID, name: 'Water mix', art: icon(null, true), note: 'for ponds' },
+  { id: WORLD_MIX_ID, name: 'Seasonal mix', art: icon(null), note: 'what’s blooming' },
+  { id: WORLD_WATER_ID, name: 'Water mix', art: icon(null, true), note: 'for ponds' },
+  // A mix for each region, on its page in the book.
+  ...REGIONS.map((r) => {
+    const emblem = SPECIES.find((s) => s.id === r.emblem) ?? SPECIES[0];
+    return { id: regionMixId(r.key), name: REGION_MIXES[r.key].name, art: icon(emblem), note: REGION_MIXES[r.key].note, region: r.key };
+  }),
 ], true);
 const foliageBook = new FlowerBook('Foliage book', SPECIES.filter((s) => s.form.kind === 'foliage'), season, (id) => picker.pick(id));
 picker.onFoliage = () => {
