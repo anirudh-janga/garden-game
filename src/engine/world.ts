@@ -959,9 +959,9 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
   let intro: { t: number; from: { distance: number; azimuth: number; target: THREE.Vector3 }; to: { distance: number; azimuth: number; target: THREE.Vector3 } } | null = null;
   const prepareIntro = () => {
     const to = { distance: rig.distance, azimuth: rig.azimuth, target: rig.target.clone() };
-    // Just in front of the cottage, looking at it from a little to one side.
-    const front = cottage.position.clone().add(new THREE.Vector3(Math.sin(-0.18), 0, Math.cos(-0.18)).multiplyScalar(3));
-    const from = { distance: Math.max(rig.minDistance * 2.6, 24), azimuth: to.azimuth + 0.32, target: new THREE.Vector3(front.x, to.target.y + 0.8, front.z) };
+    // Just in front of the cottage, looking at its porch and roof from a little to one side.
+    const front = cottage.position.clone().add(new THREE.Vector3(Math.sin(cottage.frontAzimuth), 0, Math.cos(cottage.frontAzimuth)).multiplyScalar(1.5));
+    const from = { distance: 21, azimuth: cottage.frontAzimuth + 0.42, target: new THREE.Vector3(front.x, cottage.position.y + 1.9, front.z) };
     intro = { t: -0.3, from, to };
     applyIntro(0);
   };

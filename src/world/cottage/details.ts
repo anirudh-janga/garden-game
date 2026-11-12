@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lerp } from '../../core/random';
 import { Kit, tone } from './kit';
 import { COLOURS, DORMER, PORCH, WING } from './plan';
@@ -166,14 +167,11 @@ export class WeatherVane {
   ) {
     const mat = new THREE.MeshLambertMaterial({ color: IRON, side: THREE.DoubleSide });
     this.group.position.copy(at);
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.7, 6), mat);
-    mast.position.y = 0.35;
+    const mast = new THREE.CylinderGeometry(0.012, 0.016, 0.7, 6).translate(0, 0.35, 0);
     // The four points of the compass, as a little cross under the vane.
-    const cross = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.012, 0.012), mat);
-    cross.position.y = 0.38;
-    const cross2 = cross.clone();
-    cross2.rotation.y = Math.PI / 2;
-    this.group.add(mast, cross, cross2);
+    const cross = new THREE.BoxGeometry(0.32, 0.012, 0.012).translate(0, 0.38, 0);
+    const cross2 = new THREE.BoxGeometry(0.32, 0.012, 0.012).rotateY(Math.PI / 2).translate(0, 0.38, 0);
+    this.group.add(new THREE.Mesh(mergeGeometries([mast, cross, cross2])!, mat));
     // The arrow (its point toward +x) and the hare over it.
     const arrow = new THREE.Shape();
     arrow.moveTo(-0.34, 0.0);
@@ -191,15 +189,14 @@ export class WeatherVane {
     const pts: [number, number][] = [[1.9, 0.45], [1.72, 0.62], [1.5, 0.62], [1.35, 0.95], [1.28, 1.55], [1.18, 1.58], [1.12, 1.0], [1.0, 0.78], [0.78, 0.72], [0.45, 0.68], [0.12, 0.58], [-0.05, 0.45], [-0.2, 0.5], [-0.22, 0.38], [0.0, 0.28], [0.2, 0.12], [0.12, 0.0], [0.45, 0.05], [0.62, 0.3], [0.95, 0.28], [1.15, 0.12], [1.35, 0.1], [1.38, 0.2], [1.2, 0.32], [1.3, 0.45], [1.6, 0.42]];
     pts.forEach(([x, y], i) => (i ? hare.lineTo(x * 0.1 - 0.1, y * 0.1) : hare.moveTo(x * 0.1 - 0.1, y * 0.1)));
     hare.closePath();
-    const a = new THREE.Mesh(new THREE.ShapeGeometry(arrow), mat);
-    const h = new THREE.Mesh(new THREE.ShapeGeometry(hare), mat);
-    h.position.y = 0.012;
-    // Shapes are drawn in x/y; stand them so the arrow is flat (x/z) and the hare upright (x/y).
-    a.rotation.x = -Math.PI / 2;
-    this.vane.add(a, h);
+    // Shapes are drawn in x/y; stand the arrow flat (x/z) and keep the hare upright (x/y): one mesh for both.
+    const a = new THREE.ShapeGeometry(arrow).rotateX(-Math.PI / 2);
+    const h = new THREE.ShapeGeometry(hare).translate(0, 0.012, 0);
+    const vane = new THREE.Mesh(mergeGeometries([a, h])!, mat);
+    vane.castShadow = false;
+    this.vane.add(vane);
     this.vane.position.y = 0.42;
     this.group.add(this.vane);
-    for (const m of [mast, cross, cross2, a, h]) m.castShadow = false;
   }
 
   /** `windDir`: where the wind is blowing to (x, z); `gust`: how hard (0–1ish). */
