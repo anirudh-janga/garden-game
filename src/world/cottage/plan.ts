@@ -139,5 +139,6 @@ export const DORMER = {
   eaveHalf: 0.62,
   eaveY: 3.63,
   apexY: 4.25,
-  backZ: 0.45,
+  /** Its roof runs back this far: well inside the main slope, so the two meet in a clean valley. */
+  backZ: 0.2,
 } as const;

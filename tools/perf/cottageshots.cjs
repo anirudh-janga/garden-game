@@ -17,7 +17,7 @@ const OUT = process.env.OUT || '.';
   await page.waitForTimeout(4000);
   if (process.env.TIME) await page.evaluate((t) => window.world.setTime(Number(t)), process.env.TIME);
   if (process.env.GROWN) await w.evaluate(() => { rebuildInstantly(); });
-  console.log('triangles', JSON.stringify(await w.evaluate(() => ({ ...cottage.triangles, buildMs: Math.round(cottage.buildMs) }))));
+  console.log('triangles', JSON.stringify(await w.evaluate(() => ({ triangles: cottage.triangles, buildMs: Math.round(cottage.buildMs) }))));
   const views = (process.env.VIEWS === '' ? [] : (process.env.VIEWS || 'front,left,right,back,above,close,far').split(','));
   const spec = {
     front: { d: 26, az: 0.35, y: 1.9, dy: 0 },
@@ -53,7 +53,6 @@ const OUT = process.env.OUT || '.';
       rig.update(0);
       if (s.top) { rig.minDistance = 40; }
       for (let k = 0; k < 40; k++) rig.update(1 / 60);
-      cottage.updateDetail(camera.position);
     }, s);
     await page.waitForTimeout(3000);
     await page.screenshot({ path: path.join(OUT, `cottage_${v}.png`), timeout: 180000 });

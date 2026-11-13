@@ -9,16 +9,13 @@ import { Smoke } from './smoke';
 import { addWet } from '../../render/wet';
 import { Kit } from './kit';
 import { buildMainRoof, ridgeY, roofPoint } from './roof';
-import { buildDormer, buildPorch, mainRoofHole } from './face';
+import { buildDormer, buildPorch } from './face';
 import { buildDetails, buildPlantings, buildSeasonal, WeatherVane } from './details';
 import type { Season } from '../season';
 import { buildChimney } from './chimney';
 import { buildWing } from './wing';
 import { buildPlinth, buildStoneGable, buildTimberWalls, type Glow } from './walls';
 import { COTTAGE_SCALE, FOOTPRINT, PORCH, ROOF_X0, ROOF_X1 } from './plan';
-
-/** Beyond this distance (metres from the camera) the cottage is drawn in its far form. */
-const FAR_DETAIL = 40;
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -31,10 +28,11 @@ interface Built {
 }
 
 /**
- * The cottage: one old, loved storybook house (see docs/cottage-design.md). Built once, at load,
- * as two shapes (in full, and a lighter one for when it is far off): the whole house is one
- * vertex-coloured mesh plus its glass, so it costs a couple of draw calls however much hand-made
- * detail is in it.
+ * The cottage: one old, loved storybook house (see docs/cottage-design.md). Built once, at load:
+ * the whole house is one vertex-coloured mesh plus its glass, so it costs a couple of draw calls
+ * however much hand-made detail is in it. It is the same shape at every distance and on every
+ * screen. (A lighter far-off form was tried: swapping between the two showed as the house changing
+ * while pinching, and a tall phone, which stands further back, saw a different house from a tablet.)
  */
 export class Cottage {
   readonly group = new THREE.Group();
@@ -47,13 +45,11 @@ export class Cottage {
   private readonly glassMat: THREE.MeshLambertMaterial;
   private readonly body: THREE.Mesh;
   private readonly glassMesh: THREE.Mesh;
-  private readonly near: { body: THREE.BufferGeometry; glass: THREE.BufferGeometry };
-  private readonly far: { body: THREE.BufferGeometry; glass: THREE.BufferGeometry };
   /** The windows' light (local position, and which way it spills). */
   private glow: Glow[] = [];
-  /** Triangles in the full and the far form (for the numbers in the backlog). */
-  readonly triangles: { near: number; far: number };
-  /** How long building both forms took, ms. */
+  /** Triangles in the house (for the numbers in the backlog). */
+  readonly triangles: number;
+  /** How long building it took, ms. */
   readonly buildMs: number;
   /** A chime on the eaves rang (frequency, 0–1 loudness, where). */
   onChime: (freq: number, volume: number, at: THREE.Vector3) => void = () => {};
@@ -71,13 +67,10 @@ export class Cottage {
     this.group.rotation.y = yaw;
     this.group.scale.setScalar(COTTAGE_SCALE);
     const t0 = performance.now();
-    const near = this.build(false);
-    const far = this.build(true);
+    const near = this.build();
     this.buildMs = performance.now() - t0;
     this.glow = near.glow;
-    this.triangles = { near: near.triangles, far: far.triangles };
-    this.near = { body: near.body, glass: near.glass };
-    this.far = { body: far.body, glass: far.glass };
+    this.triangles = near.triangles;
     this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     addWet(this.bodyMat, 0.8); // roof and stone darken and take a sheen in the rain
     this.glassMat = new THREE.MeshLambertMaterial({ color: '#3a2a1a', emissive: '#ffbf6e', emissiveIntensity: this.snowy ? 2.2 : 1.6 });
@@ -99,9 +92,10 @@ export class Cottage {
     this.group.add(this.vane.group);
   }
 
-  /** The house as geometry: `far` is the lighter form. */
-  private build(far: boolean): Built {
-    // (The same seed for both forms: the far house is the same house.)
+  /** The house as geometry. */
+  private build(): Built {
+    // (The builders can also make a lighter form, `far`: not used, see above.)
+    const far = false;
     const rng = createRng(this.seed);
     const main = new Kit();
     const glass = new Kit();
@@ -111,7 +105,7 @@ export class Cottage {
     buildStoneGable(main, rng, far);
     buildTimberWalls(kits, rng);
     buildWing(kits, rng, this.snowy);
-    buildMainRoof(main, rng, { far, snowy: this.snowy, skip: (x, u, side) => side === 1 && mainRoofHole(x, u) });
+    buildMainRoof(main, rng, { far, snowy: this.snowy });
     buildPorch(kits, rng, this.snowy);
     buildDormer(kits, rng, this.snowy);
     buildDetails(kits, rng);
@@ -131,19 +125,6 @@ export class Cottage {
     set.group.scale.setScalar(0.9);
     this.group.add(set.group);
     this.chimeSet = set;
-  }
-
-  /** Draw the house in its full or its far form, by how far the camera is. */
-  updateDetail(camera: THREE.Vector3) {
-    const d = camera.distanceTo(this.position);
-    const far = this.body.geometry === this.far.body;
-    if (!far && d > FAR_DETAIL + 3) this.show(this.far);
-    else if (far && d < FAR_DETAIL - 3) this.show(this.near);
-  }
-
-  private show(s: { body: THREE.BufferGeometry; glass: THREE.BufferGeometry }) {
-    this.body.geometry = s.body;
-    this.glassMesh.geometry = s.glass;
   }
 
   /** After dark the windows burn brighter. */

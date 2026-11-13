@@ -860,10 +860,12 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     for (const p of near) extent = Math.max(extent, Math.hypot(p.x - cx, p.z - cz));
     rig.focusOn(new THREE.Vector3(cx, ground.heightAt(cx, cz) + 0.4, cz), extent * 2.3 + 1.8);
   }
-  /** Glide to a three-quarter view of the cottage's front (pinch out to come back). */
+  /** How far back the camera must stand for something `width` metres across to fit the screen, whatever its shape. */
+  const distanceToFit = (width: number) => width / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.min(camera.aspect, 1.6));
+  /** Glide to a three-quarter view of the cottage's front, the whole house in view (pinch out to come back). */
   function focusOnCottage() {
     const c = cottage.position;
-    rig.focusOn(new THREE.Vector3(c.x, c.y + 2, c.z), 15, cottage.frontAzimuth + 0.45);
+    rig.focusOn(new THREE.Vector3(c.x + 0.6, c.y + 1.9, c.z), Math.max(15, distanceToFit(11.5)), cottage.frontAzimuth + 0.45);
   }
 
   // --- Undo / redo ---------------------------------------------------------------------------
@@ -961,7 +963,8 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     const to = { distance: rig.distance, azimuth: rig.azimuth, target: rig.target.clone() };
     // Just in front of the cottage, looking at its porch and roof from a little to one side.
     const front = cottage.position.clone().add(new THREE.Vector3(Math.sin(cottage.frontAzimuth), 0, Math.cos(cottage.frontAzimuth)).multiplyScalar(1.5));
-    const from = { distance: 21, azimuth: cottage.frontAzimuth + 0.42, target: new THREE.Vector3(front.x, cottage.position.y + 1.9, front.z) };
+    // (Near enough to see the door and the roof's tiles; on a narrow screen, far enough to see most of the house.)
+    const from = { distance: Math.max(21, distanceToFit(8)), azimuth: cottage.frontAzimuth + 0.42, target: new THREE.Vector3(front.x, cottage.position.y + 1.9, front.z) };
     intro = { t: -0.3, from, to };
     applyIntro(0);
   };
@@ -1178,7 +1181,6 @@ export function createWorld(canvas: HTMLCanvasElement | OffscreenCanvas, link: L
     gardenBounds.update();
     flowers.updateDetail(camera.position);
     stones.updateDetail(camera.position);
-    cottage.updateDetail(camera.position);
     const shadows = renderer.shadowMap.needsUpdate;
     for (const c of cullers) {
       if (shadows && c.casts) c.showAll();

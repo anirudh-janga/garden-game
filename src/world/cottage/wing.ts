@@ -87,13 +87,13 @@ export function buildWing(kits: WallKits, rng: () => number, snowy: boolean) {
   // The pantry's little window in the right wall.
   const w = V(x1 + 0.012, 0.95, -0.45);
   if (!far) kit.box(w.x, w.y, w.z, 0.04, 0.5, 0.42, tone(COLOURS.windowPaint, rng, 0.02));
-  const g = [V(w.x + 0.025, w.y - 0.19, w.z + 0.15), V(w.x + 0.025, w.y - 0.19, w.z - 0.15), V(w.x + 0.025, w.y + 0.19, w.z - 0.15), V(w.x + 0.025, w.y + 0.19, w.z + 0.15)];
+  const g = [V(w.x + 0.035, w.y - 0.19, w.z + 0.15), V(w.x + 0.035, w.y - 0.19, w.z - 0.15), V(w.x + 0.035, w.y + 0.19, w.z - 0.15), V(w.x + 0.035, w.y + 0.19, w.z + 0.15)];
   kits.glass.quad(g[0], g[1], g[2], g[3], new THREE.Color('#ffffff'), V(1, 0, 0));
   kits.glow.push({ at: V(w.x + 0.03, w.y, w.z), out: V(1, 0, 0), size: 0.6 });
   if (!far) {
     const white = tone(COLOURS.windowPaint, rng, 0.02);
-    kit.box(w.x + 0.03, w.y, w.z, 0.02, 0.4, 0.02, white);
-    kit.box(w.x + 0.03, w.y, w.z, 0.02, 0.02, 0.32, white);
+    kit.box(w.x + 0.045, w.y, w.z, 0.02, 0.4, 0.02, white);
+    kit.box(w.x + 0.045, w.y, w.z, 0.02, 0.02, 0.32, white);
   }
   // The roof: one slope, tiled like the main roof.
   const length = Math.hypot(EAVE_X - x0, WING.roofHigh - WING.roofLow);
