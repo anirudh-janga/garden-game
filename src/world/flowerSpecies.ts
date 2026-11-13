@@ -18,12 +18,33 @@ import { EUROPE } from './species/europe';
 /** How a plant's leaves are drawn (see `exotic.ts`). */
 export type LeafHabit = 'strap' | 'paddle' | 'sword' | 'rosette' | 'feathery' | 'heart' | 'succulent' | 'leathery' | 'none';
 
-/** A small bloom of a bush: a ring of petals, a trumpet, a cup, or a ball (camellia's double). */
+/**
+ * One bloom of a shrub (see `drawBloom` in `exotic.ts`): a ring of broad petals, a double, a
+ * trumpet, a bell, a puff of stamens, a head of little flowers, three papery bracts, a fluffy ball,
+ * or a flat star.
+ */
 export interface SmallBloom {
-  type: 'radial' | 'trumpet' | 'cup' | 'pom';
-  petals?: number;
+  type: 'single' | 'double' | 'trumpet' | 'bell' | 'brush' | 'cluster' | 'bracts' | 'pom' | 'star';
+  /** Petal length, metres (before storybook scaling). */
   size: number;
+  petals?: number;
+  /** The colour of its boss of stamens (or of a trumpet's stamens). */
   centre?: string;
+  /** Radians from the bloom's axis its petals open to (a cluster: how far round the ball its florets reach). */
+  open?: number;
+  /** A darker flare at the heart of each petal, 0…1. */
+  blotch?: number;
+  /** A trumpet's stamens are one long column standing out of it (hibiscus). */
+  column?: boolean;
+  pointed?: boolean;
+  /** How many little flowers in a cluster, or filaments in a brush. */
+  florets?: number;
+  /** How cupped each petal is. */
+  cup?: number;
+  /** A trumpet's narrow tube below its petals, this many times their length (angel's trumpet). */
+  tube?: number;
+  /** A cluster drawn up into a cone this many times its width (a lilac's truss). */
+  tall?: number;
 }
 
 /** The kinds of water plant (see `aquatic` in flowers.ts). */
@@ -66,7 +87,23 @@ export interface RadialForm {
 export type FlowerForm =
   | RadialForm
   | { kind: 'cup'; petals: number; length: number; width: number; open: number }
-  | { kind: 'spike'; florets: number; spikeLength: number; floretSize: number; bell: boolean }
+  | {
+      kind: 'spike';
+      florets: number;
+      spikeLength: number;
+      floretSize: number;
+      bell: boolean;
+      /** Real little flowers up the spire in place of plain buds (see `spire` in exotic.ts). */
+      floret?: 'tube' | 'bell' | 'pea' | 'butterfly' | 'star';
+      /** Leaves at the foot, in place of the stem's own. */
+      leaves?: LeafHabit;
+      /** Flowers in rings of five (a candelabra primula). */
+      whorls?: boolean;
+      /** The flowers stand out from the stem, furthest at the bottom: a cone-shaped truss, this wide for its length. */
+      taper?: number;
+      /** Petals of a star floret. */
+      petals?: number;
+    }
   | {
       kind: 'aquatic';
       type: AquaticType;
@@ -115,13 +152,17 @@ export type FlowerForm =
   /** A cylinder, candle, dome, comb, plume, spire or flame of stiff filaments or tiny florets (bottlebrush, banksia, grevillea, astilbe, celosia, blazing star, foxtail lily, paintbrush). */
   | { kind: 'brush'; style: 'cylinder' | 'candle' | 'dome' | 'comb' | 'plume' | 'spire' | 'flame'; length: number; radius: number; tip?: string; leaves?: LeafHabit }
   /** An arching spray of orchid blooms: moth (round and flat), cattleya (a frilled lip), star (narrow and pointed), slipper (a pouch). */
-  | { kind: 'orchid'; type: 'moth' | 'cattleya' | 'star' | 'slipper'; flowers: number; size: number; lip: string; leaves?: LeafHabit }
-  /** One flaring funnel of joined petals on a stem: a hibiscus, amaryllis or lily (a long column of stamens if `column`), hanging (an angel's trumpet) or upright (a gentian). */
-  | { kind: 'trumpet'; length: number; flare: number; lobes: number; hang?: boolean; column?: string; leaves?: LeafHabit }
+  | { kind: 'orchid'; type: 'moth' | 'cattleya' | 'star' | 'slipper'; flowers: number; size: number; lip: string; upright?: boolean; leaves?: LeafHabit }
+  /**
+   * Great trumpets of joined, rolled-back petals on a stem: one looking up (a gentian, `nod` radians
+   * from upright), several facing outward round the top (amaryllis), or up the stem (`stack`: a
+   * Madonna lily). `column` colours the stamens; `open` is how wide the mouth flares.
+   */
+  | { kind: 'trumpet'; length: number; flare: number; lobes: number; hang?: boolean; column?: string; count?: number; nod?: number; stack?: boolean; open?: number; leaves?: LeafHabit }
   /** A ring of hanging bells under a tuft of leaves, on a tall bare stem (crown imperial). */
   | { kind: 'crown'; bells: number; size: number; leaves?: LeafHabit }
   /** A woody mound with its own leaves, carrying many small blooms (camellia, hibiscus, plumbago, oleander…). */
-  | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'ferny'; leafColor?: string }
+  | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'grey'; leafColor?: string; /** The blooms hang under the bush's edge (angel's trumpet). */ hang?: boolean }
   | {
       kind: 'cluster';
       florets: number;
@@ -129,8 +170,10 @@ export type FlowerForm =
       floretSize: number;
       /** Flat-topped (sedum, yarrow), a domed mophead (hydrangea, geranium), or a ball on a bare stem (allium). */
       shape?: 'flat' | 'dome' | 'globe';
-      /** The florets are little trumpets (agapanthus, clivia) rather than stars. */
-      floret?: 'trumpet' | 'pouch';
+      /** Each floret a real little flower on its own stalk: a trumpet (agapanthus, clivia), a pouch (slipper flower) or a star. */
+      floret?: 'trumpet' | 'pouch' | 'star';
+      /** A dot of this colour at the heart of each star floret. */
+      eye?: string;
       leaves?: LeafHabit;
     };
 

@@ -1,13 +1,13 @@
 // One close-up tile per plant (three plants of it, its three shape variants, in bloom), montaged later by plantgrid.py.
 // IDS="a,b" or REGION=<key> or NEW=1 (every plant added by the atlas). Writes <id>.png into $OUT.
-// FARFORM=1 shows the far-off shapes instead. SEASON picks the season (default summer).
+// FARFORM=1 shows the far-off shapes instead. SEASON picks the season (default summer). DSF=2 for tiles twice as sharp.
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const OUT = process.env.OUT || '.';
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const page = await browser.newPage({ viewport: { width: 300, height: 340 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width: 300, height: 340 }, deviceScaleFactor: Number(process.env.DSF || 1) });
   page.on('pageerror', (e) => console.log('pageerror', e.message));
   await page.addInitScript(() => localStorage.clear());
   await page.goto(`http://localhost:${process.env.PORT || 4173}/?debug&q=5&season=${process.env.SEASON || 'summer'}`, { timeout: 600000 });
@@ -33,6 +33,7 @@ const OUT = process.env.OUT || '.';
     renderer.shadowMap.enabled = false;
   });
   fs.writeFileSync(path.join(OUT, 'list.json'), JSON.stringify(list));
+  let first = true;
   for (const p of list) {
     await w.evaluate(({ id, far }) => {
       flowers.reset();
@@ -58,7 +59,8 @@ const OUT = process.env.OUT || '.';
       camera.position.set(X + Math.sin(0.25) * Math.cos(pitch) * d, ty + Math.sin(pitch) * d, Z + 0.06 + Math.cos(0.25) * Math.cos(pitch) * d);
       camera.lookAt(X, ty, Z + 0.06);
     }, { id: p.id, far: !!process.env.FARFORM });
-    await page.waitForTimeout(Number(process.env.WAIT || 1500));
+    await page.waitForTimeout(Number(process.env.WAIT || 1500) + (first ? 2500 : 0));
+    first = false;
     await page.screenshot({ path: path.join(OUT, `${p.id}.png`), timeout: 180000 });
   }
   console.log('done', list.length);
