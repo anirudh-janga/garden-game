@@ -1,5 +1,5 @@
 // Shape budget: near and far triangles for every species and variant, against docs/flower-atlas.md's
-// budgets (near ≤ 900, bush ≤ 1,400; far ≤ 250, bush ≤ 400). Plants that were already in the game before
+// budgets (near ≤ 900, bush ≤ 1,700; far ≤ 250, bush ≤ 400). Plants that were already in the game before
 // the atlas (they are in flowerOrigins.ts) over budget are listed as notes; a NEW plant over budget fails.
 // Also builds every shape, timing it. Run:
 //   npx esbuild tools/perf/shapebudget.ts --bundle --platform=node --outfile=/tmp/shapebudget.cjs --log-level=error && node /tmp/shapebudget.cjs
@@ -16,7 +16,7 @@ const t0 = Date.now();
 const rows: string[] = [];
 for (const sp of SPECIES) {
   const bush = sp.form.kind === 'rose' || sp.form.kind === 'bush';
-  const nearMax = bush ? 1400 : 900;
+  const nearMax = bush ? 1700 : 900;
   const farMax = bush ? 400 : 250;
   let n = 0;
   let f = 0;

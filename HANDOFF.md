@@ -22,6 +22,8 @@ Two rules came out of the review; keep to them:
   while pinching must not swap to something that looks different.
 - **No solid lumps standing in for foliage.** A shrub is stems, leaves and flowers, like the
   roses. A leaf-coloured mass was tried and the player called it "green blobs".
+- **Leaves are rounded.** Four-triangle kites were tried for shrub leaves and the player called
+  them "a bunch of triangles". Look at leaves close up too (`ZOOM=2.6` with `plantgrid.cjs`).
 - **A plant isn't done until it has been looked at.** Render it with `tools/perf/plantgrid.cjs`
   (near, then `FARFORM=1`), montage with `plantgrid.py`, and compare it with the real plant.
 
