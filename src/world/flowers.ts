@@ -4,7 +4,7 @@ import { createRng, lerp } from '../core/random';
 import { addWind } from '../render/wind';
 import type { AquaticType, FlowerSpecies, LeafHabit } from './flowerSpecies';
 import { FlowerMesh } from './flowerMesh';
-import { exoticGeometry, leafHabit, type Helpers } from './exotic';
+import { basalLeaves, exoticGeometry, isExotic, type Helpers } from './exotic';
 import { Patches, sharedGeometry, swapDetail } from '../render/patches';
 import type { Season } from './season';
 
@@ -1062,20 +1062,10 @@ function archPlant(m: FlowerMesh, f: { florets: number; floretSize: number; shap
           drop.translate(hang.x, hang.y - size * 1.7, hang.z);
           m.addGeometry(drop, WHITE, true, p, 1);
         }
-      } else if (f.shape === 'tube') {
-        // A long hanging tube, flared at the mouth (a kōwhai's golden lantern).
-        const tube = new THREE.ConeGeometry(size * 0.5, size * 2.6, far ? 4 : 5, 1, true).translate(hang.x, hang.y - size * 1.3, hang.z);
-        m.addGeometry(tube, WHITE, true, p, 0.3);
       } else if (f.shape === 'lantern') {
         // A papery puffed lantern with a little point at the bottom (a Chinese lantern plant's husk).
         const husk = new THREE.IcosahedronGeometry(size * 1.1, 0).scale(0.85, 1.25, 0.85).translate(hang.x, hang.y - size * 1.1, hang.z);
         m.addGeometry(husk, WHITE, true, p, 0);
-      } else if (f.shape === 'pea') {
-        // A pea flower: a broad banner behind and a curved keel (with a black boss, if the second colour is dark).
-        const banner = new THREE.OctahedronGeometry(size * 1.1, far ? 0 : 1).scale(0.35, 1.1, 1).rotateY(az).translate(hang.x, hang.y - size * 0.6, hang.z);
-        m.addGeometry(banner, WHITE, true, p, 0);
-        const keel = new THREE.ConeGeometry(size * 0.4, size * 1.8, 4).rotateX(Math.PI / 2 + 0.5).rotateY(az).translate(hang.x, hang.y - size * 1.4, hang.z);
-        m.addGeometry(keel, WHITE, true, p, 1);
       } else {
         // A bell: the outer flared cup, and a longer inner skirt in the second colour.
         const bell = new THREE.ConeGeometry(size * (far ? 0.95 : 0.75), size * 1.6, far ? 4 : 7, 1, true);
@@ -1191,7 +1181,7 @@ function pincushionHead(m: FlowerMesh, top: THREE.Vector3, f: { size: number; sp
 function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radius: number; leaves?: LeafHabit }, rng: () => number): THREE.BufferGeometry {
   // Grassy leaves arching from the base (or a rosette of thick ones: an aloe).
   const far = isFar();
-  if (f.leaves) leafHabit(m, helpers(), f.leaves, 0.3, rng);
+  if (f.leaves) basalLeaves(m, helpers(), f.leaves, top.y, rng);
   const nLeaves = f.leaves ? 0 : far ? 4 : 8;
   for (let i = 0; i < nLeaves; i++) {
     const az = (i / nLeaves) * Math.PI * 2 + rng() * 0.4;
@@ -1225,7 +1215,25 @@ function torchHead(m: FlowerMesh, top: THREE.Vector3, f: { length: number; radiu
 }
 
 /** What the newer shape builders (exotic.ts) borrow from here. */
-const helpers = (): Helpers => ({ petal, strip, leafStrip, stem, isFar, HEAD, LEAF, STEM, WHITE });
+const helpers = (): Helpers => ({
+  petal,
+  strip,
+  stem,
+  isFar,
+  light: (fn) => {
+    const was = denseHeads;
+    denseHeads = true;
+    try {
+      fn();
+    } finally {
+      denseHeads = was;
+    }
+  },
+  HEAD,
+  LEAF,
+  STEM,
+  WHITE,
+});
 
 export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: number): THREE.BufferGeometry {
   // Up close, a plant's own seed mixes in after its height is set, so each one is unique.
@@ -1253,7 +1261,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
     geo.userData.headY = 0;
     return geo;
   }
-  if (sp.form.kind === 'bush' || sp.form.kind === 'bracts' || sp.form.kind === 'spathe' || sp.form.kind === 'crane' || sp.form.kind === 'fan' || sp.form.kind === 'spider' || sp.form.kind === 'brush' || sp.form.kind === 'orchid' || sp.form.kind === 'trumpet' || sp.form.kind === 'crown') return exoticGeometry(sp, m, height, rng, helpers());
+  if (isExotic(sp.form)) return exoticGeometry(sp, m, height, rng, helpers());
   if (sp.form.kind === 'arch') {
     const geo = archPlant(m, sp.form, height, rng);
     return geo;
@@ -1270,7 +1278,8 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
   }
   const top = stem(m, height, lean, rng);
   if (sp.form.kind === 'pincushion') return pincushionHead(m, top, sp.form, rng);
-  const base = sp.form;
+  // (Every other kind has returned by here.)
+  const base = sp.form as Extract<FlowerSpecies['form'], { kind: 'radial' | 'cup' | 'spike' | 'cluster' }>;
   const f: typeof base =
     base.kind === 'spike'
       ? { ...base, floretSize: base.floretSize * HEAD, spikeLength: base.spikeLength * 1.5 }
@@ -1328,7 +1337,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const n = Math.round(f.petals[0]);
       for (let i = 0; i < n; i++) {
         const az = (i / n) * Math.PI * 2;
-        const horn = new THREE.ConeGeometry(f.width * 0.5, f.length * 1.3, 4).translate(0, -f.length * 0.65, 0).rotateZ(0.5).rotateY(-az);
+        const horn = new THREE.ConeGeometry(f.width * 0.3, f.length * 1.05, 4).translate(0, -f.length * 0.52, 0).rotateZ(0.42).rotateY(-az);
         horn.translate(top.x + Math.cos(az) * f.length * 0.35, top.y - 0.005, top.z + Math.sin(az) * f.length * 0.35);
         m.addGeometry(horn, WHITE, true, top, 0.3);
       }
@@ -1364,7 +1373,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       }
     }
     m.setTilt(null, null);
-    if (f.leaves) leafHabit(m, helpers(), f.leaves, Math.max(0.15, height * 0.5), rng);
+    if (f.leaves) basalLeaves(m, helpers(), f.leaves, height, rng);
   } else if (f.kind === 'cluster') {
     // Sedum and yarrow: a flat-topped head of tiny star florets; hydrangea a rounded mophead;
     // allium a ball of stars held up on its bare stem.
@@ -1388,23 +1397,9 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
         attach = new THREE.Vector3(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r);
       }
       const size = f.floretSize * lerp(0.8, 1.2, rng()) * (isFar() ? 1.4 : 1);
-      let g: THREE.BufferGeometry;
-      if (f.floret === 'trumpet') {
-        // A little trumpet, open end up and out, set on a short pedicel.
-        g = new THREE.ConeGeometry(size * 0.55, size * 2.1, isFar() ? 4 : 6, 1, true).rotateX(Math.PI);
-        const out = new THREE.Vector3(attach.x - top.x, 0.5, attach.z - top.z);
-        if (out.x === 0 && out.z === 0) out.set(0, 1, 0);
-        g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, out.normalize()));
-        g.translate(attach.x, attach.y, attach.z);
-      } else if (f.floret === 'pouch') {
-        // A little pouch (a slipper flower's inflated lip).
-        g = new THREE.IcosahedronGeometry(size * 1.3, 0).scale(1, 0.8, 1.2);
-        g.translate(attach.x, attach.y, attach.z);
-      } else {
-        g = isFar() ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.OctahedronGeometry(size, 0);
-        g.scale(1, 0.5, 1);
-        g.translate(attach.x, attach.y, attach.z);
-      }
+      const g = isFar() ? new THREE.TetrahedronGeometry(size * 1.1, 0) : new THREE.OctahedronGeometry(size, 0);
+      g.scale(1, 0.5, 1);
+      g.translate(attach.x, attach.y, attach.z);
       m.addGeometry(g, WHITE, true, top);
     }
     // Short branching stalks under the dome (an allium's stalks are hidden inside its ball).
@@ -1414,7 +1409,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const side = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.004);
       m.tri(top.clone().sub(side), tip, top.clone().add(side), { color: STEM });
     }
-    if (f.leaves) leafHabit(m, helpers(), f.leaves, Math.max(0.2, height * 0.45), rng);
+    if (f.leaves) basalLeaves(m, helpers(), f.leaves, height, rng);
   } else if (f.kind === 'cup') {
     for (let i = 0; i < f.petals; i++) {
       const inner = i % 2 === 1;

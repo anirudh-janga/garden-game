@@ -131,6 +131,36 @@ plants need these additions. Each is built in the story that first needs it and 
 | **`crown`** | A ring of hanging bells under a tuft of leaves, on a tall bare stem (crown imperial). | Mediterranean |
 | **Aquatic `victoria`** | Giant rimmed pads (a metre and more across) with a white bloom that turns pink. | South America |
 
+### 3.1 As built after the review (R12, Nov 2026)
+
+The first build of these shapes was reviewed plant by plant and mostly re-drawn. What exists now
+(`src/world/exotic.ts`; data in `src/world/species/*.ts`):
+
+- **Leaves by habit** (`basalLeaves`): `strap`, `sword`, `paddle`, `rosette`, `feathery`, `heart`,
+  `succulent`, `whorl` (three leaves under the flower: trillium) and `leathery` (stiff leaves up a
+  woody stem: proteas, banksia, bottlebrush). Sizes follow the plant but stay within what such
+  leaves measure.
+- **A bloom, drawn upright and then turned** (`drawBloom`): `single`, `double`, `trumpet` (rolled-back
+  petals; `column` for a hibiscus, `tube` for an angel's trumpet), `bell`, `brush`, `cluster` (a head
+  of little flowers; `tall` makes a lilac's cone), `bracts`, `pom`, `star`. Hung blooms are lit from
+  outside (`FlowerMesh.invert`).
+- **Shrub** (`bush`): soft overlapping billows of leaf, lit as one mound and flat underneath, leaves
+  standing out of it, blooms set over it facing outward (`hang` hangs them from its shoulders;
+  `leaf: 'bare'` is branches and blossom alone). A shrub is at least a third as wide as it is tall.
+- **Umbels and spires with real florets**: `cluster.floret` (`trumpet`, `pouch`, `star` with an
+  optional `eye`) and `spike.floret` (`tube`, `bell`, `pea`, `butterfly`, `star`; `whorls`, `taper`).
+- **`spider`** gained `nod` (a turk's-cap lily) and sweeps its petals up when `open` is small (flame lily).
+
+Plants whose kind differs from the tables below, because the real plant is built that way: busy
+Lizzie, Madagascar periwinkle and pride of Barbados (shrubs), tiger lily (`spider` with `nod`),
+toad lily (`fan` with leaves up the stem), balloon flower (`radial`, pointed), canna and ginger
+lily (`spike` of `butterfly` flowers), angel's trumpet and lilac (shrubs), African violet, drumstick
+primula, candytuft, statice and butterfly weed (umbels of `star` florets), billy buttons, globe
+amaranth, thrift, floss flower and slipper flower (heads of `pouch` florets). Not drawn: spots
+(tiger lily, toad lily), the fritillary's chequers, the balloon flower's puffed buds.
+
+To look at any plant: `tools/perf/plantgrid.cjs` (one close-up tile per plant) and `plantgrid.py`.
+
 Four of today's shapes (`arch`, `cloud`, `pincushion`, `torch`) have far shapes that are nearly as
 heavy as their near shapes (96–100%). Story 12.2 gives them real far shapes before the collection
 grows.

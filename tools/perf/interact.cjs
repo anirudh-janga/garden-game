@@ -44,7 +44,7 @@ const mode = process.env.MODE || '';
   console.log('after redo: actions', await actions());
   // 5) cottage tap (Look around tool): the camera glides in on the cottage
   await tool('move');
-  await ev(() => { rig.distance = 30; rig.azimuth = 0; rig.target.set(cottage.position.x, 0.6, cottage.position.z + 6); rig.update(0); });
+  await ev(() => { rig.distance = rig.maxDistance * 0.7; rig.azimuth = 0; rig.target.set(cottage.position.x, 0.6, cottage.position.z + 6); rig.update(0); });
   await page.waitForTimeout(800);
   const c = await ev(() => { const p = cottage.position.clone(); p.y += 2; p.project(camera); return { x: (p.x + 1) / 2 * 390, y: (1 - p.y) / 2 * 844 }; });
   const d0c = await ev(() => rig.distance);

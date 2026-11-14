@@ -1,29 +1,31 @@
 # Handoff notes — Milestones 11 and 12
 
-Written 12 Nov 2026. Read `CLAUDE.md` and the Status section of `BACKLOG.md` first; this file is
+Written 12 Nov 2026, updated 14 Nov after the review. Read `CLAUDE.md` and the Status section of `BACKLOG.md` first; this file is
 the detail behind them. Delete it when both milestones are done.
 
 ## 1. Where things stand
 
-Milestones 11 (the cottage, 11.1–11.7) and 12 (the flowers, 12.1–12.13) are built and live, waiting for the player's review; 11.8 (a cat) is optional and not started. The plans they were built from:
+Milestones 11 (the cottage, 11.1–11.7) and 12 (the flowers, 12.1–12.13) are built and live. On
+13–14 Nov the player asked for a review of both ("flawless details on flowers", and a cottage that
+"should work across devices and not change with pinch to zoom"); that review is row **R12** in the
+backlog, live and waiting for their look on the phone. 11.8 (a cat) is optional and not started.
 
 | What | Where |
 |---|---|
-| The stories (8 for the cottage, 13 for the flowers) | `BACKLOG.md`, "Milestone 11" and "Milestone 12" |
+| The stories (8 for the cottage, 13 for the flowers) and the review | `BACKLOG.md`, "Milestone 11", "Milestone 12", row R12 |
 | The cottage's design: sizes, colours, every detail | `docs/cottage-design.md`, front view in `docs/cottage-elevation.svg` |
-| The plant list: 145 new plants in nine regions, origins of today's 85, the new shapes | `docs/flower-atlas.md` |
+| The plant list, and how the new shapes are built now | `docs/flower-atlas.md` (section 3.1 is the shapes as built) |
 
-Next: whatever the player's review brings. 11.8 (a cat) is optional: ask before building it. The
-plants' looks are stylised and some are rough (see each story's row in the backlog): `plantsheet.cjs`
-makes a picture sheet to look at them one by one.
+Two rules came out of the review; keep to them:
 
-The player's instruction for this planning session was "create stories, don't implement". Whoever
-picks this up should wait for the player to say go, then work one story at a time: build, deploy,
-mark it 👀, stop for their review on the iPhone (`CLAUDE.md`).
+- **The cottage has one shape at every distance.** No far form. Anything the player can watch
+  while pinching must not swap to something that looks different.
+- **A plant isn't done until it has been looked at.** Render it with `tools/perf/plantgrid.cjs`
+  (near, then `FARFORM=1`), montage with `plantgrid.py`, and compare it with the real plant.
 
-The design documents are part of the stories. If something in them can't be built as written, or
-turns out wrong (a size that looks bad, a plant fact that's off), change the document in the same
-commit and say so in the status row. Don't quietly build something else.
+Next: whatever the player's review brings. Work one story at a time: build, deploy, mark it 👀,
+stop for their review on the iPhone (`CLAUDE.md`). The design documents are part of the stories:
+if something in them turns out wrong, change the document in the same commit and say so.
 
 ## 2. How to ship a story
 
@@ -66,6 +68,9 @@ serve each on its own port, and pass `PORT=<port>` to the script.
 |---|---|
 | `worldfp.cjs` | A fingerprint of every built instance (position, scale, colour, per shape). `GARDEN=user OUT=/tmp/a.txt node tools/perf/worldfp.cjs` (the player's garden) or `GARDEN=test`. Diff against `baselines/world-user-9.1.txt` / `world-test-9.1.txt`: identical means nothing moved, vanished or changed colour. (After 9.5 the shape keys differ from the 9.1 files but instance totals per system match: save fresh baselines at the start of 11.1 and diff against those.) |
 | `shapefp.ts` | A fingerprint of every flower and leaf shape, near and far. `npx esbuild tools/perf/shapefp.ts --bundle --platform=node --outfile=/tmp/shapefp.cjs --log-level=error && node /tmp/shapefp.cjs > /tmp/shapes.txt`. Save a fresh baseline before 12.1 (three variants per species now) and after each regional story. |
+| `plantgrid.cjs`, `plantgrid.py` | One close-up tile per plant (three plants, its three variants, in bloom, nothing else in the scene), montaged into labelled sheets. `OUT=dir REGION=africa NEW=1 DSF=2 WAIT=500 node tools/perf/plantgrid.cjs && python3 tools/perf/plantgrid.py dir 4 3`. `IDS=a,b` picks plants, `FARFORM=1` shows the far shapes, `PORT=` another build (for before and after). About 4 s a plant. |
+| `shapebudget.ts`, `seasons.ts`, `atlascheck.ts` | Triangle budgets for every plant (a new plant over budget fails); every shape built in all four seasons with none empty or broken; the plant counts per region. Each is bundled with esbuild and run with node (the command is at the top of the file). |
+| `devices.cjs`, `cottageshots.cjs` | The opening view, the whole garden and the cottage tap on phone, landscape, tablet and desktop screens (`ONLY=phone,tablet`); the cottage from every side (`VIEWS`, `SEASON`, `TIME`). |
 | `farcost.ts` | Near and far triangles per species for a set of plant counts (`COUNTS=<json file>`). The starting point for 12.2's `shapebudget.ts`. |
 | `meshcount.cjs` | Player's garden: non-empty garden meshes (draw calls zoomed out) and triangles drawn at two close views. |
 | `overview.cjs` | Player's garden at full zoom-out: draw calls, triangles, a breakdown by system. |
@@ -89,13 +94,17 @@ Inside the world worker, `?debug` exposes globals for `worker.evaluate(...)`: `r
 
 ## 4. Things to know before touching the cottage
 
-- Today's cottage is `src/world/cottage.ts` (666 lines, one `build()`), styled by
-  `cottageStyle.ts` and the drawer in `src/ui/cottagePanel.ts`; `main.ts` and `world.ts` hold the
-  wiring (`cottageTap`, `setCottageStyle`, the `cottage` action in `garden.ts`).
+- The cottage is `src/world/cottage/` (`plan.ts` the numbers, `kit.ts` the hand-made helpers, then
+  `walls.ts`, `roof.ts`, `chimney.ts`, `wing.ts`, `face.ts`, `details.ts`, `smoke.ts`, `index.ts`).
+  It is built once, in one shape; there are no options and no far form.
+- Two faces must never share a plane (they flicker as the camera moves): set glass, hinges,
+  curtains and the like a centimetre or two proud of what is behind them.
 - Many systems ask `cottage.contains(x, z, margin)` (paths, beds, fences, ponds, rocks, props,
   wildflowers, bunnies, the forest edge). The footprint grows in 11.2 (the wing and the chimney).
-- The camera looks down at 34–64° from 9 m to 160 m, and since 10.1 comes as close as 1.6 m at
-  15°. The roof is most of what is seen; the walls matter up close.
+- The camera looks down at 34–64° from 9 m out to a furthest view that depends on the screen's
+  shape (about 159 m on a portrait phone, 106 m on a tablet, 66 m on a desktop), and since 10.1
+  comes as close as 1.6 m at 15°. Views that frame something should fit it to the screen
+  (`distanceToFit` in `world.ts`), not stand a fixed distance off. The roof is most of what is seen; the walls matter up close.
 - Shaders: anything that first appears mid-play compiles then, and that is a hitch (story 9.1).
   Seasonal dressing (snow, icicles, leaves) should share the cottage's materials or be warmed at
   load (`src/render/warm.ts`).
@@ -105,8 +114,10 @@ Inside the world worker, `?debug` exposes globals for `worker.evaluate(...)`: `r
 
 ## 5. Things to know before touching the flowers
 
-- Species are data in `src/world/flowerSpecies.ts`; shapes are built in `src/world/flowers.ts`
-  (`flowerGeometry`, one function per shape kind, each with an `isFar()` lighter version) and
+- The first 85 species are data in `src/world/flowerSpecies.ts`, the 145 of the atlas in
+  `src/world/species/<region>.ts`. Shapes are built in `src/world/flowers.ts` (`flowerGeometry`:
+  the older kinds) and `src/world/exotic.ts` (the atlas's kinds: leaves by habit, blooms, shrubs,
+  umbels, spires…), each with an `isFar()` lighter version, and
   ahead of time in `src/engine/shapes.worker.ts`. Picker and book: `src/ui/flowerPicker.ts`
   (`icon()` draws a species' icon from its form), `src/ui/flowerBook.ts`.
 - `VARIANTS = 3` shapes per species; each is a mesh per 20 m patch of ground (`Patches`). Every

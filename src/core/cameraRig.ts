@@ -29,6 +29,8 @@ export class CameraRig {
   private lastMid = new THREE.Vector2();
   /** A glide to a place of interest (see `focusOn`): any touch lets go of it. */
   private glide: { target: THREE.Vector3; distance: number; azimuth?: number } | null = null;
+  /** The height the view centre rests at in the ordinary view (a glide to something tall holds its own until the next touch). */
+  private restY = 0.6;
   /** Set by the toolbar later: when false, one finger is free for building. */
   oneFingerPans = true;
 
@@ -52,6 +54,7 @@ export class CameraRig {
    */
   focusOn(target: THREE.Vector3, distance: number, azimuth?: number) {
     this.glide = { target: target.clone(), distance: clamp(distance, this.closeDistance, this.maxDistance), azimuth };
+    this.restY = target.y;
     this.velPan.set(0, 0);
     this.velZoom = 0;
     this.velRot = 0;
@@ -61,6 +64,7 @@ export class CameraRig {
     this.el.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.glide = null;
+    this.restY = 0.6;
     this.velPan.set(0, 0);
     this.velZoom = 0;
     this.velRot = 0;
@@ -121,6 +125,7 @@ export class CameraRig {
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
     this.glide = null;
+    this.restY = 0.6;
     this.zoomBy(e.deltaY * 0.0015);
   };
 
@@ -167,7 +172,7 @@ export class CameraRig {
       if (turned && this.target.distanceTo(this.glide.target) < 0.02 && Math.abs(logD - Math.log(this.glide.distance)) < 0.01) this.glide = null;
     } else if (this.distance > this.minDistance) {
       // Back up in the garden, the view centre settles to its usual height again.
-      this.target.y += (0.6 - this.target.y) * (1 - Math.exp(-dt * 3));
+      this.target.y += (this.restY - this.target.y) * (1 - Math.exp(-dt * 3));
     }
     if (this.pointers.size === 0) {
       // Inertia: keep gliding after the fingers lift, easing to rest.

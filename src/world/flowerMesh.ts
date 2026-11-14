@@ -19,6 +19,8 @@ export class FlowerMesh {
   /** How far toward the petal's edge (0 heart … 1 tip): bicolour flowers blend to their edge colour. */
   edge: number[] = [];
   /** Optional rotation applied to everything added (used to tilt a whole bloom, e.g. pansies). */
+  /** Turn the automatic normals of `tri` over: for a bloom drawn upright and then hung upside down, so its outside still faces the light. */
+  invert = false;
   private xo: THREE.Vector3 | null = null;
   private xq: THREE.Quaternion | null = null;
 
@@ -38,6 +40,7 @@ export class FlowerMesh {
   tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, opts: { n?: THREE.Vector3; ns?: [THREE.Vector3, THREE.Vector3, THREE.Vector3]; shade?: [number, number, number]; color: THREE.Color; petal?: boolean; hinge?: THREE.Vector3; axis?: THREE.Vector3; close?: number; glow?: number; edge?: [number, number, number] }) {
     let n = opts.n ?? new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
     if (n.y < 0 && !opts.n) n.negate();
+    if (this.invert && !opts.n) n.negate();
     n = this.td(n);
     const shade = opts.shade ?? [1, 1, 1];
     const hinge = opts.hinge ? this.tp(opts.hinge) : null;

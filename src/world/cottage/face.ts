@@ -3,6 +3,9 @@ import { lerp } from '../../core/random';
 import { tone } from './kit';
 import { COLOURS, DOOR, DORMER, PORCH, REVEAL, type Opening } from './plan';
 import { clayTile, roofPoint, snowSheet, tileField } from './roof';
+
+// (Nothing is cut out of the main roof for the porch or the dormer: their roofs simply stand through it, and
+// what lies beneath them is hidden. Cutting tiles out left a stair-stepped edge with the dark deck showing.)
 import { at, boxIn, limewash, reveal, window, type Frame, type WallKits } from './walls';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -10,19 +13,6 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 /** The porch roof's height at x (it stands at 45 degrees from its ridge over the door). */
 export function porchRoofY(x: number): number {
   return PORCH.apexY - Math.abs(x - PORCH.cx);
-}
-
-/** Should the main roof's tile here be left out, because the porch or the dormer stands over it? */
-export function mainRoofHole(x: number, u: number): boolean {
-  const z = 2.15 * (1 - u);
-  const y = roofPoint(x, u, 1).y;
-  // The porch's roof rises through the main roof's eaves, over the door.
-  if (Math.abs(x - PORCH.cx) < PORCH.half + 0.05 && z > PORCH.backZ + 0.05 && y < porchRoofY(x) + 0.08) return true;
-  // The dormer's volume: between its cheeks, and (behind them) under its own roof, between its face and its ridge.
-  const dx = Math.abs(x - DORMER.cx);
-  if (dx < DORMER.half + 0.02 && z < DORMER.faceZ + 0.1 && z > DORMER.backZ - 0.05 && y < DORMER.apexY - dx + 0.1) return true;
-  if (dx < DORMER.eaveHalf + 0.04 && z < 1.0 && z > DORMER.backZ - 0.05 && y < DORMER.apexY - dx + 0.1) return true;
-  return false;
 }
 
 /** The porch: flagstone floor and step, two oak posts with curved braces, and its own little tiled gable. */
@@ -117,7 +107,7 @@ export function buildDormer(kits: WallKits, rng: () => number, snowy: boolean) {
     const n = far ? 2 : 6;
     let prev: { b: THREE.Vector3; t: THREE.Vector3 } | null = null;
     for (let i = 0; i <= n; i++) {
-      const z = lerp(faceZ, backZ + 0.5, i / n);
+      const z = lerp(faceZ, 0.8, i / n);
       const u = 1 - z / 2.15;
       const b = roofPoint(x, u, 1);
       const t = V(x, Math.max(b.y + 0.05, eaveY - 0.05), z);
@@ -146,7 +136,8 @@ export function buildDormer(kits: WallKits, rng: () => number, snowy: boolean) {
     }
   }
   const ridge = tone(COLOURS.ridge, rng, 0.04);
-  for (let z = backZ + 0.1; z < faceZ; z += 0.28) k.box(cx, apexY + 0.03, z + 0.14, 0.14, 0.09, 0.27, ridge, 0);
+  // (The ridge runs back until the main slope swallows it.)
+  for (let z = 0.42; z < faceZ; z += 0.28) k.box(cx, apexY + 0.03, z + 0.14, 0.14, 0.09, 0.27, ridge, 0);
   for (const sx of [-1, 1]) k.timber(rng, V(cx + sx * eaveHalf, eaveY - 0.04, faceZ + 0.07), V(cx, apexY + 0.02, faceZ + 0.07), 0.045, 0.11, oak(), { far, bow: 0.005 });
   void REVEAL;
   void DOOR;

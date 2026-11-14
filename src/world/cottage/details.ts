@@ -3,7 +3,6 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lerp } from '../../core/random';
 import { Kit, tone } from './kit';
 import { COLOURS, DORMER, PORCH, WING } from './plan';
-import { mainRoofHole } from './face';
 import { roofPoint } from './roof';
 const DORMER_CX = DORMER.cx;
 import type { WallKits } from './walls';
@@ -375,9 +374,8 @@ export function buildSeasonal(kits: WallKits, rng: () => number) {
   const nOut = V(0, 0.77, 0.64);
   const nBack = V(0, 0.77, -0.64);
   const onRoof = (x: number, u: number, side: 1 | -1) => {
-    if (mainRoofHole(x, u)) return;
     const p = roofPoint(x, u, side);
-    leaf(k, rng, p.add(V(0, 0.035, 0)), side === 1 ? nOut : nBack, 0.05 + rng() * 0.035, tone(cols[Math.floor(rng() * cols.length)], rng, 0.08));
+    leaf(k, rng, p.add(V(0, 0.055, 0)), side === 1 ? nOut : nBack, 0.05 + rng() * 0.035, tone(cols[Math.floor(rng() * cols.length)], rng, 0.08));
   };
   if (!far) {
     for (let i = 0; i < 40; i++) onRoof(-2.7 + rng() * 5.4, 0.04 + rng() * 0.5, 1);

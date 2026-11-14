@@ -243,16 +243,17 @@ function door(kits: WallKits, rng: () => number, f: Frame) {
   // Two long iron strap hinges, a ring handle and a small leaded light at eye height.
   const iron = new THREE.Color(COLOURS.iron);
   for (const v of [v0 + 0.3, v1 - 0.35]) {
-    const a = P(u0 + 0.05, v - 0.025, 0.012);
-    const b = P(u0 + 0.05 + DOOR.w * 0.55, v - 0.025, 0.012);
-    kits.main.quad(a, b, P(u0 + 0.05 + DOOR.w * 0.55, v + 0.025, 0.012), P(u0 + 0.05, v + 0.025, 0.012), iron, f.normal);
+    const a = P(u0 + 0.05, v - 0.025, 0.02);
+    const b = P(u0 + 0.05 + DOOR.w * 0.55, v - 0.025, 0.02);
+    kits.main.quad(a, b, P(u0 + 0.05 + DOOR.w * 0.55, v + 0.025, 0.02), P(u0 + 0.05, v + 0.025, 0.02), iron, f.normal);
   }
   const ring = P(u1 - 0.14, v0 + 0.95, 0.02);
   kits.main.box(ring.x, ring.y, ring.z, 0.05, 0.05, 0.03, iron);
-  const lg = (du: number, dv: number) => P(DOOR.c + du, v0 + 1.4 + dv, 0.012);
+  const lg = (du: number, dv: number, out = 0.014) => P(DOOR.c + du, v0 + 1.4 + dv, out);
   const frameC = tone(COLOURS.windowPaint, rng, 0.02);
   kits.main.quad(lg(-0.1, -0.1), lg(0.1, -0.1), lg(0.1, 0.1), lg(-0.1, 0.1), frameC, f.normal);
-  kits.glass.quad(lg(-0.07, -0.07), lg(0.07, -0.07), lg(0.07, 0.07), lg(-0.07, 0.07), new THREE.Color('#ffffff'), f.normal);
+  // (The glass stands proud of its frame: the two were in one plane, and flickered.)
+  kits.glass.quad(lg(-0.07, -0.07, 0.03), lg(0.07, -0.07, 0.03), lg(0.07, 0.07, 0.03), lg(-0.07, 0.07, 0.03), new THREE.Color('#ffffff'), f.normal);
   // The lintel over it: oak, bowed.
   k.timber(rng, at(f, u0 - 0.16, v1 + 0.1, 0.05), at(f, u1 + 0.16, v1 + 0.1, 0.05), 0.16, 0.18, tone(COLOURS.oak[0], rng, 0.04), { bow: 0.018, far: kits.far });
   // A worn stone step, one riser high.
@@ -479,7 +480,7 @@ export function buildPlinth(kit: Kit, rng: () => number, far: boolean) {
 /** Cream curtains just inside the glass, tied back at each side. */
 function curtains(kits: WallKits, rng: () => number, f: Frame, u0: number, u1: number, v0: number, v1: number) {
   const w = u1 - u0;
-  const push = -REVEAL + 0.012;
+  const push = -REVEAL + 0.022; // (clear of the glass by more than depth precision at full zoom-out)
   const cream = () => tone('#f3ead6', rng, 0.04);
   for (const side of [-1, 1]) {
     const edge = side < 0 ? u0 + 0.03 : u1 - 0.03;
@@ -527,9 +528,9 @@ function shutter(kits: WallKits, rng: () => number, f: Frame, hinge: number, dir
     const a = (i / n) * Math.PI * 2;
     const x = 16 * Math.sin(a) ** 3;
     const y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
-    hp.push(pt(0.5 + (x * 0.0045) / w, vc + y * 0.0042, 0.004));
+    hp.push(pt(0.5 + (x * 0.0045) / w, vc + y * 0.0042, 0.012));
   }
-  const mid = pt(0.5, vc - 0.005, 0.004);
+  const mid = pt(0.5, vc - 0.005, 0.012);
   for (let i = 0; i < n; i++) kits.main.tri(mid, hp[i], hp[(i + 1) % n], dark, f.normal);
   // Two iron pintles at the hinge edge.
   const iron = new THREE.Color(COLOURS.iron);
@@ -541,7 +542,7 @@ function openSash(kits: WallKits, rng: () => number, f: Frame, u0: number, v0: n
   const a = (20 * Math.PI) / 180;
   const pt = (du: number, v: number) => at(f, u0 + du * Math.cos(a), v, -REVEAL * 0.55 + du * Math.sin(a));
   // The room behind: the light's opening shows dark.
-  kits.main.quad(at(f, u0, v0, -REVEAL + 0.006), at(f, u0 + lw, v0, -REVEAL + 0.006), at(f, u0 + lw, v1, -REVEAL + 0.006), at(f, u0, v1, -REVEAL + 0.006), new THREE.Color('#2a2018'), f.normal);
+  kits.main.quad(at(f, u0, v0, -REVEAL + 0.03), at(f, u0 + lw, v0, -REVEAL + 0.03), at(f, u0 + lw, v1, -REVEAL + 0.03), at(f, u0, v1, -REVEAL + 0.03), new THREE.Color('#2a2018'), f.normal);
   const paint = tone(COLOURS.windowPaint, rng, 0.02);
   kits.glass.quad(pt(0.04, v0 + 0.04), pt(lw - 0.02, v0 + 0.04), pt(lw - 0.02, v1 - 0.04), pt(0.04, v1 - 0.04), new THREE.Color('#ffffff'), f.normal);
   const bar = (d0: number, d1: number, va: number, vb: number) => kits.main.quad(pt(d0, va), pt(d1, va), pt(d1, vb), pt(d0, vb), paint, f.normal);
