@@ -16,7 +16,7 @@ Rules that hold for every plant:
 - **Seasons are the player's own** (`seasons` already works this way): a Cape flower that blooms
   in the southern spring blooms in the player's spring.
 - **Hand-made** (CLAUDE.md): no two plants alike; the existing per-plant variation applies.
-- **Budgets:** near shape at most 900 triangles for an ordinary plant and 1,400 for a bush; far
+- **Budgets:** near shape at most 900 triangles for an ordinary plant and 1,700 for a bush (1,400 at first; raised when the shrubs' leaves were rounded at the player's request); far
   shape at most 250 (bush 400). Three shape variants per species (`VARIANTS`).
 
 ## 1. The nine regions
@@ -136,6 +136,9 @@ plants need these additions. Each is built in the story that first needs it and 
 The first build of these shapes was reviewed plant by plant and mostly re-drawn. What exists now
 (`src/world/exotic.ts`; data in `src/world/species/*.ts`):
 
+- **Leaf outlines are rounded** (`OUTLINE` in `exotic.ts`): a leaf widens quickly from its stalk, runs
+  full and closes to a soft point. Pointed kites read as shards up close; the only pointed `blade`s
+  are an aloe's leaves and the bird of paradise's beak.
 - **Leaves by habit** (`basalLeaves`): `strap`, `sword`, `paddle`, `rosette`, `feathery`, `heart`,
   `succulent`, `whorl` (three leaves under the flower: trillium) and `leathery` (stiff leaves up a
   woody stem: proteas, banksia, bottlebrush). Sizes follow the plant but stay within what such
@@ -145,7 +148,8 @@ The first build of these shapes was reviewed plant by plant and mostly re-drawn.
   of little flowers; `tall` makes a lilac's cone), `bracts`, `pom`, `star`. Hung blooms are lit from
   outside (`FlowerMesh.invert`).
 - **Shrub** (`bush`): built like the rose bushes. Woody stems from the ground fork into branches
-  whose tips are spread over a dome; real folded leaves all along the branches and up the stems;
+  whose tips are spread over a dome; real leaves all along the branches and up the stems (each a
+  rounded oval of eight rim points, folded on its midrib and shaded smoothly; none may reach into a flower);
   a bloom at the end of each branch, then more along them (`hang` hangs them from the tips;
   `leaf: 'bare'` is branches and blossom alone). **Never a solid body of leaf**: a first version
   had one and the player called it green blobs.

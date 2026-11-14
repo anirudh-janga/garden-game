@@ -1,6 +1,6 @@
 // One close-up tile per plant (three plants of it, its three shape variants, in bloom), montaged later by plantgrid.py.
 // IDS="a,b" or REGION=<key> or NEW=1 (every plant added by the atlas). Writes <id>.png into $OUT.
-// FARFORM=1 shows the far-off shapes instead. SEASON picks the season (default summer). DSF=2 for tiles twice as sharp.
+// FARFORM=1 shows the far-off shapes instead. SEASON picks the season (default summer). DSF=2 for tiles twice as sharp. ZOOM=2.5 moves in on the middle of the plants, to judge leaves and petals.
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -35,7 +35,7 @@ const OUT = process.env.OUT || '.';
   fs.writeFileSync(path.join(OUT, 'list.json'), JSON.stringify(list));
   let first = true;
   for (const p of list) {
-    await w.evaluate(({ id, far }) => {
+    await w.evaluate(({ id, far, zoom }) => {
       flowers.reset();
       const sp = flowers.species.find((s) => s.id === id);
       const X = 3, Z = 7;
@@ -52,13 +52,13 @@ const OUT = process.env.OUT || '.';
       }
       flowers.update(30);
       if (far) scene.traverse((o) => { if (o.userData && o.userData.lod) o.geometry = o.userData.lod.far; });
-      const span = Math.max(H * 1.75, wide * 3.2);
+      const span = Math.max(H * 1.75, wide * 3.2) / zoom;
       const d = span / (2 * Math.tan((15 * Math.PI) / 180)) * 1.05;
       const pitch = 0.42;
       const ty = y0 + Math.max(H * 0.56, 0.03);
       camera.position.set(X + Math.sin(0.25) * Math.cos(pitch) * d, ty + Math.sin(pitch) * d, Z + 0.06 + Math.cos(0.25) * Math.cos(pitch) * d);
       camera.lookAt(X, ty, Z + 0.06);
-    }, { id: p.id, far: !!process.env.FARFORM });
+    }, { id: p.id, far: !!process.env.FARFORM, zoom: Number(process.env.ZOOM || 1) });
     await page.waitForTimeout(Number(process.env.WAIT || 1500) + (first ? 2500 : 0));
     first = false;
     await page.screenshot({ path: path.join(OUT, `${p.id}.png`), timeout: 180000 });
