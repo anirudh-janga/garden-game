@@ -67,44 +67,111 @@ function twig(m: FlowerMesh, a: THREE.Vector3, b: THREE.Vector3, r: number, colo
 }
 
 type LeafShape = 'lance' | 'ovate' | 'strap' | 'paddle' | 'blade';
-const OUTLINE: Record<LeafShape, [number, number][]> = {
-  // (Rounded outlines: a leaf widens quickly from its stalk, runs full, and closes to a soft point.)
-  lance: [[0, 0.16], [0.2, 0.8], [0.48, 1], [0.76, 0.72], [0.93, 0.32], [1, 0]],
-  ovate: [[0, 0.2], [0.14, 0.76], [0.36, 1], [0.62, 0.93], [0.83, 0.6], [0.95, 0.26], [1, 0]],
+/** A leaf's outline: stations along its midrib, each [how far along, how wide there] (both 0…1). */
+type Outline = [number, number][];
+const OUTLINE: Record<LeafShape, Outline> = {
+  // (A leaf widens quickly from its stalk, runs full, and draws out to a point.)
+  lance: [[0, 0.16], [0.22, 0.82], [0.5, 1], [0.8, 0.6], [1, 0]],
+  ovate: [[0, 0.2], [0.15, 0.78], [0.4, 1], [0.68, 0.86], [0.9, 0.4], [1, 0]],
   // (A stiff pointed blade: an aloe's leaf, a bird of paradise's beak.)
   blade: [[0, 0.12], [0.42, 1], [1, 0]],
   strap: [[0, 0.7], [0.3, 1], [0.72, 0.8], [1, 0]],
   paddle: [[0, 0.12], [0.22, 0.86], [0.6, 1], [0.88, 0.6], [1, 0]],
 };
+const VEIN = new THREE.Color('#c4dc96');
+/** An outline cut down for far off: its stalk end, its widest point, a shoulder beyond that, and its tip (so it is still a leaf, not a kite). */
+function farOutline(o: Outline): Outline {
+  if (o.length <= 4) return o;
+  let w = 0;
+  for (let i = 1; i < o.length - 1; i++) if (o[i][1] > o[w][1]) w = i;
+  const out: Outline = [o[0], o[w]];
+  if (w + 1 < o.length - 1) out.push(o[w + 1]);
+  out.push(o[o.length - 1]);
+  return out;
+}
 
 /**
- * One leaf: from `base` along `dir`, `len` long and `half` wide at its widest (each side), its
- * tip drooping by `droop` of its length. In the plant's own green unless given a colour.
+ * A leaf blade, made the way a real one is: a midrib from stalk to tip with a half-blade either
+ * side of it, the two halves folded up a little from the rib (so each catches the light
+ * differently), the rib itself paler, the whole leaf arching over toward its tip and twisted a
+ * touch. Shaded smoothly across each half, so no facets show. `flat` is the plain outline used
+ * from far off.
+ */
+function leafBlade(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, sideIn: THREE.Vector3, len: number, half: number, stations: Outline, color: THREE.Color, o: { droop: number; keel?: number; twist?: number; dark?: number; flat?: boolean; rib?: boolean }) {
+  const side = sideIn.clone().normalize();
+  const up = V().crossVectors(side, dir);
+  if (up.y < 0) up.negate();
+  up.normalize();
+  const keel = o.flat ? 0 : (o.keel ?? 0.2);
+  const frame = (t: number): [THREE.Vector3, THREE.Vector3] => {
+    const a = (o.twist ?? 0) * t;
+    return [side.clone().multiplyScalar(Math.cos(a)).addScaledVector(up, Math.sin(a)), up.clone().multiplyScalar(Math.cos(a)).addScaledVector(side, -Math.sin(a))];
+  };
+  const pt = (t: number, w: number, lift = 0) => {
+    const [sd, u] = frame(t);
+    return base.clone().addScaledVector(dir, len * t).addScaledVector(UP, -o.droop * len * t * t).addScaledVector(sd, w * half).addScaledVector(u, Math.abs(w) * half * keel + lift);
+  };
+  const sh = (t: number) => lerp(o.dark ?? 0.74, 1.08, t);
+  if (o.flat) {
+    for (let i = 0; i + 1 < stations.length; i++) {
+      const [t0, w0] = stations[i];
+      const [t1, w1] = stations[i + 1];
+      if (w0 > 0 && w1 > 0) {
+        m.tri(pt(t0, -w0), pt(t1, -w1), pt(t1, w1), { color, shade: [sh(t0), sh(t1), sh(t1)] });
+        m.tri(pt(t0, -w0), pt(t1, w1), pt(t0, w0), { color, shade: [sh(t0), sh(t1), sh(t0)] });
+      } else if (w0 > 0) m.tri(pt(t0, -w0), pt(t1, 0), pt(t0, w0), { color, shade: [sh(t0), sh(t1), sh(t0)] });
+      else m.tri(pt(t0, 0), pt(t1, -w1), pt(t1, w1), { color, shade: [sh(t0), sh(t1), sh(t1)] });
+    }
+    return;
+  }
+  const RIB = 1.1;
+  const RIM = 0.95;
+  for (const sg of [-1, 1]) {
+    // (The half turned from the light is a shade darker: the crease down a leaf.)
+    const tone = sg < 0 ? 1.03 : 0.92;
+    for (let i = 0; i + 1 < stations.length; i++) {
+      const [t0, w0] = stations[i];
+      const [t1, w1] = stations[i + 1];
+      const [s0, u0] = frame(t0);
+      const [s1, u1] = frame(t1);
+      const c0 = pt(t0, 0);
+      const c1 = pt(t1, 0);
+      const n0 = u0.clone().addScaledVector(s0, -sg * 0.3).normalize();
+      const n1 = u1.clone().addScaledVector(s1, -sg * 0.3).normalize();
+      const a0 = sh(t0) * tone;
+      const a1 = sh(t1) * tone;
+      if (w0 > 0 && w1 > 0) {
+        const r0 = pt(t0, sg * w0);
+        const r1 = pt(t1, sg * w1);
+        m.tri(c0, r0, r1, { color, n: u0, ns: [u0, n0, n1], shade: [a0 * RIB, a0 * RIM, a1 * RIM] });
+        m.tri(c0, r1, c1, { color, n: u0, ns: [u0, n1, u1], shade: [a0 * RIB, a1 * RIM, a1 * RIB] });
+      } else if (w0 > 0) m.tri(c0, pt(t0, sg * w0), c1, { color, n: u0, ns: [u0, n0, u1], shade: [a0 * RIB, a0 * RIM, a1] });
+      else m.tri(c0, pt(t1, sg * w1), c1, { color, n: u0, ns: [u0, n1, u1], shade: [a0, a1 * RIM, a1 * RIB] });
+    }
+  }
+  if (o.rib) {
+    // The midrib: a pale sliver from stalk to tip, a hair above the fold.
+    const lift = half * 0.03 + 0.0006;
+    const t0 = stations[0][0];
+    const w = 0.05;
+    m.tri(pt(t0, -w, lift), pt(1, 0, lift), pt(t0, w, lift), { color: color.clone().lerp(VEIN, 0.4), n: up, shade: [0.95, 1.08, 0.95] });
+  }
+}
+
+/**
+ * One leaf of the given outline: from `base` along `dir`, `len` long and `half` wide at its widest
+ * (each side), its tip drooping by `droop` of its length. In the plant's own green unless given a colour.
  */
 function leaf(m: FlowerMesh, H: Helpers, base: THREE.Vector3, dir: THREE.Vector3, len: number, half: number, o: { shape?: LeafShape; droop?: number; color?: THREE.Color; side?: THREE.Vector3; dark?: number } = {}) {
   const side = o.side ?? V().crossVectors(dir, UP);
   if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
-  side.normalize();
-  const droop = o.droop ?? 0.25;
-  const color = o.color ?? H.LEAF;
-  let stations = OUTLINE[o.shape ?? 'lance'];
-  if (H.isFar()) stations = [stations[0], stations[Math.ceil(stations.length / 2) - 1], stations[stations.length - 1]];
-  const at = (t: number, k: number) => base.clone().addScaledVector(dir, len * t).addScaledVector(UP, -droop * len * t * t).addScaledVector(side, k);
-  const sh = (t: number) => lerp(o.dark ?? 0.72, 1.06, t);
-  for (let i = 0; i + 1 < stations.length; i++) {
-    const [t0, w0] = stations[i];
-    const [t1, w1] = stations[i + 1];
-    const l0 = at(t0, -w0 * half);
-    const r0 = at(t0, w0 * half);
-    if (w1 === 0) {
-      m.tri(l0, at(t1, 0), r0, { color, shade: [sh(t0), sh(t1), sh(t0)] });
-    } else {
-      const l1 = at(t1, -w1 * half);
-      const r1 = at(t1, w1 * half);
-      m.tri(l0, l1, r1, { color, shade: [sh(t0), sh(t1), sh(t1)] });
-      m.tri(l0, r1, r0, { color, shade: [sh(t0), sh(t1), sh(t0)] });
-    }
-  }
+  const shape = o.shape ?? 'lance';
+  let stations = OUTLINE[shape];
+  const far = H.isFar();
+  if (far) stations = farOutline(stations);
+  // (Strap leaves and blades are keeled, not folded; only the broader leaves show a midrib.)
+  const narrow = shape === 'strap' || shape === 'blade';
+  leafBlade(m, base, dir, side, len, half, stations, o.color ?? H.LEAF, { droop: o.droop ?? 0.25, dark: o.dark, flat: far, keel: narrow ? 0.22 : 0.2, rib: !narrow && half > 0.012 });
 }
 
 /**
@@ -444,48 +511,19 @@ function bloomFacing(m: FlowerMesh, H: Helpers, b: SmallBloom, p: THREE.Vector3,
 
 // --- Habits --------------------------------------------------------------------------------------
 
-/**
- * A leaf of a shrub: a rounded oval (eight points round its rim) folded a little along its
- * midrib and shaded smoothly across, so it reads as a soft curved leaf and not as facets. Far
- * off, and for needles, a plainer flat outline.
- */
-function shrubLeaf(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, len: number, half: number, color: THREE.Color, plain: 'no' | 'far' | 'needle') {
-  const side = V().crossVectors(dir, UP);
-  if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
-  side.normalize();
-  const up = V().crossVectors(side, dir).normalize();
-  // A point of the leaf: `t` along it, `w` across (−1…1), the rim lifted either side of the midrib.
-  const at = (t: number, w: number, lift = 0.4) => base.clone().addScaledVector(dir, len * t).addScaledVector(UP, -len * 0.2 * t * t).addScaledVector(side, w * half).addScaledVector(up, Math.abs(w) * half * lift);
-  if (plain === 'needle') {
-    m.tri(at(0, 0), at(0.45, -1, 0), at(1, 0), { color, shade: [0.8, 1, 1.08] });
-    m.tri(at(0, 0), at(1, 0), at(0.45, 1, 0), { color, shade: [0.8, 1.08, 1] });
-    return;
-  }
-  if (plain === 'far') {
-    // (Six points, flat: from far off only the outline shows.)
-    const a = at(0, 0);
-    const z = at(1, 0);
-    const [l0, l1, r0, r1] = [at(0.3, -1, 0), at(0.72, -0.78, 0), at(0.3, 1, 0), at(0.72, 0.78, 0)];
-    m.tri(a, l0, r0, { color, shade: [0.8, 0.95, 0.95] });
-    m.tri(l0, l1, r0, { color, shade: [0.95, 1.05, 0.95] });
-    m.tri(r0, l1, r1, { color, shade: [0.95, 1.05, 1.05] });
-    m.tri(l1, z, r1, { color, shade: [1.05, 1.1, 1.05] });
-    return;
-  }
-  const rim: [number, number][] = [[0.17, 0.74], [0.45, 1], [0.76, 0.74]];
-  const a = at(0, 0);
-  const z = at(1, 0);
-  const c = at(0.47, 0);
-  const nUp = up;
-  for (const sg of [-1, 1]) {
-    // (Each half leans in toward the midrib; shading runs smoothly from one corner to the next.)
-    const nRim = up.clone().addScaledVector(side, -sg * 0.55).normalize();
-    const pts = [a, ...rim.map(([t, w]) => at(t, sg * w)), z];
-    const ns = [nUp, nRim, nRim, nRim, nUp];
-    const sh = [0.76, 0.98, 1.06, 1.08, 1.12];
-    for (let i = 0; i + 1 < pts.length; i++) m.tri(c, pts[i], pts[i + 1], { color, n: nUp, ns: [nUp, ns[i], ns[i + 1]], shade: [0.9, sh[i], sh[i + 1]] });
-  }
-}
+/** The leaves a shrub may carry: each a real leaf's outline, with the proportions that go with it. */
+const SHRUB_LEAF: Record<'elliptic' | 'ovate' | 'heart' | 'lance' | 'little', { outline: Outline; wide: number; long: number }> = {
+  // Camellia, gardenia, laurel: widest at the middle, a point at each end.
+  elliptic: { outline: [[0, 0], [0.17, 0.8], [0.47, 1], [0.78, 0.64], [1, 0]], wide: 1, long: 1 },
+  // Hibiscus, angel's trumpet: broadest below the middle, drawn out to a long tip.
+  ovate: { outline: [[0, 0], [0.13, 0.9], [0.4, 1], [0.74, 0.56], [1, 0]], wide: 1.12, long: 1 },
+  // Lilac: nearly as wide as long at its shoulders, then a fine point.
+  heart: { outline: [[0, 0], [0.1, 0.94], [0.34, 1], [0.7, 0.44], [1, 0]], wide: 1.3, long: 0.88 },
+  // Oleander, rhododendron, wattle: long and narrow.
+  lance: { outline: [[0, 0], [0.2, 0.78], [0.5, 1], [0.8, 0.6], [1, 0]], wide: 1, long: 1 },
+  // The small leaves of plumbago, rock rose, lantana.
+  little: { outline: [[0, 0], [0.3, 0.94], [0.68, 0.84], [1, 0]], wide: 1, long: 1 },
+};
 
 /**
  * A shrub, built the way the rose bushes are: woody stems from the ground that fork into
@@ -556,21 +594,33 @@ function shrub(m: FlowerMesh, H: Helpers, f: Form<'bush'>, height: number, rng: 
   const inBloom = (q: THREE.Vector3) => !f.hang && spots.some((sp) => sp.p.distanceToSquared(q) < clear * clear);
 
   if (!bare) {
-    // Leaves all along every branch, turned outward and up, no two the same size or green.
-    const [len0, half0] = f.leaf === 'long' ? [0.19, 0.03] : f.leaf === 'small' || f.leaf === 'grey' ? [0.11, 0.038] : f.leaf === 'needle' ? [0.1, 0.008] : [0.14, 0.05];
-    const k = (far ? 1.7 : 1) * clamp(height / 0.9, 0.5, 1.1);
-    // (Fewer, fuller leaves: each one costs more now that it is rounded.)
-    const per = far ? 3 : f.leaf === 'needle' ? 8 : f.leaf === 'small' || f.leaf === 'grey' ? 5 : 4;
-    const plain = f.leaf === 'needle' ? 'needle' : far ? 'far' : 'no';
+    // Leaves all along every branch, set round the twig one after another as they grow (each a
+    // little further round than the last), angled forward and turned up to the light; no two
+    // the same size or green.
+    const small = f.leaf === 'small' || f.leaf === 'grey';
+    const kind = f.leaf === 'needle' ? null : SHRUB_LEAF[f.leafShape ?? (f.leaf === 'long' ? 'lance' : small ? 'little' : 'elliptic')];
+    const [len0, half0] = f.leaf === 'long' ? [0.19, 0.03] : small ? [0.11, 0.038] : f.leaf === 'needle' ? [0.1, 0.008] : [0.14, 0.05];
+    const k = (far ? 1.5 : 1) * clamp(height / 0.9, 0.5, 1.1);
+    const per = far ? 3 : f.leaf === 'needle' ? 8 : small ? 5 : 4;
+    let turn = rng() * 6;
     const one = (p: THREE.Vector3, bdir: THREE.Vector3) => {
-      const o = outward(p);
-      const dir = o.multiplyScalar(0.7).addScaledVector(bdir, 0.45).add(V((rng() - 0.5) * 1.1, 0.25 + rng() * 0.35, (rng() - 0.5) * 1.1)).normalize();
+      const [u, v] = square(bdir);
+      turn += GOLD + (rng() - 0.5) * 0.5;
+      const dir = bdir.clone().multiplyScalar(0.55).addScaledVector(u, Math.cos(turn) * 0.84).addScaledVector(v, Math.sin(turn) * 0.84).add(V((rng() - 0.5) * 0.25, 0.3, (rng() - 0.5) * 0.25)).normalize();
       // (Lower and inner leaves sit in the bush's own shade.)
-      const tone = leafTone.clone().multiplyScalar(lerp(0.8, 1.22, clamp(p.y / height, 0, 1)) * lerp(0.9, 1.12, rng()));
-      const len = len0 * k * lerp(0.8, 1.2, rng());
-      const half = half0 * k * lerp(0.85, 1.15, rng());
+      const tone = leafTone.clone().multiplyScalar(lerp(0.8, 1.2, clamp(p.y / height, 0, 1)) * lerp(0.9, 1.12, rng()));
+      const len = len0 * k * lerp(0.8, 1.2, rng()) * (kind?.long ?? 1);
+      const half = half0 * k * lerp(0.85, 1.15, rng()) * (kind?.wide ?? 1);
       if (inBloom(p.clone().addScaledVector(dir, len * 0.5)) || inBloom(p.clone().addScaledVector(dir, len * 0.95))) return;
-      shrubLeaf(m, p, dir, len, half, tone, plain);
+      const side = V().crossVectors(dir, UP);
+      if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+      if (!kind) {
+        // (A needle: a keeled sliver.)
+        leafBlade(m, p, dir, side, len, half, OUTLINE.blade, tone, { droop: 0.15, flat: true });
+        return;
+      }
+      const outline = far ? farOutline(kind.outline) : kind.outline;
+      leafBlade(m, p, dir, side, len, half, outline, tone, { droop: lerp(0.1, 0.32, rng()), twist: (rng() - 0.5) * 0.7, flat: far, rib: !small });
     };
     for (const b of tips) {
       const bdir = b.tip.clone().sub(b.from).normalize();
@@ -578,7 +628,7 @@ function shrub(m: FlowerMesh, H: Helpers, f: Form<'bush'>, height: number, rng: 
       for (let i = 0; i < per; i++) one(along(b, lerp(0.16, 0.84, (i + rng() * 0.6) / per)), bdir);
     }
     // (And up the main stems, so the bush is clothed nearly to the ground.)
-    if (!far) for (const knee of knees) for (let i = 0; i < 3; i++) one(V(knee.x, knee.y, knee.z).multiplyScalar(lerp(0.45, 1, i / 2)), UP);
+    if (!far) for (const knee of knees) for (let i = 0; i < 2; i++) one(V(knee.x, knee.y, knee.z).multiplyScalar(lerp(0.55, 1, i)), knee.clone().normalize());
   }
 
   const draw = () => {
@@ -1233,7 +1283,7 @@ function hangingTubes(m: FlowerMesh, H: Helpers, height: number, f: Form<'arch'>
     for (let i = 0; i < segs; i++) twig(m, pt(i / segs), pt((i + 1) / segs), 0.006 * (1 - (i / segs) * 0.5), wood, 0.9);
     const side = V(-d.z, 0, d.x);
     // Small leaves along the stem.
-    if (!far) for (let i = 0; i < 7; i++) leaf(m, H, pt(0.25 + i * 0.1), side.clone().multiplyScalar(i % 2 ? 1 : -1).addScaledVector(UP, 0.4).normalize(), 0.07, 0.014, { droop: 0.3 });
+    if (!far) for (let i = 0; i < 6; i++) leaf(m, H, pt(0.25 + i * 0.12), side.clone().multiplyScalar(i % 2 ? 1 : -1).addScaledVector(UP, 0.4).normalize(), 0.07, 0.014, { droop: 0.3 });
     const n = far ? Math.ceil(f.florets * 0.5) : f.florets;
     for (let i = 0; i < n; i++) {
       const p = pt(lerp(0.5, 1, i / Math.max(1, n - 1)));

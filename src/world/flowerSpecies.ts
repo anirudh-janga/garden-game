@@ -162,7 +162,7 @@ export type FlowerForm =
   /** A ring of hanging bells under a tuft of leaves, on a tall bare stem (crown imperial). */
   | { kind: 'crown'; bells: number; size: number; leaves?: LeafHabit }
   /** A woody mound with its own leaves, carrying many small blooms (camellia, hibiscus, plumbago, oleander…). */
-  | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'grey'; leafColor?: string; /** The blooms hang under the bush's edge (angel's trumpet). */ hang?: boolean }
+  | { kind: 'bush'; bloom: SmallBloom; blooms: number; radius: number; leaf: 'glossy' | 'small' | 'long' | 'needle' | 'bare' | 'grey'; leafColor?: string; /** The outline of its leaves, when not the usual one for `leaf` (a lilac's hearts, a hibiscus's broad pointed ovals). */ leafShape?: 'elliptic' | 'ovate' | 'heart' | 'lance'; /** The blooms hang under the bush's edge (angel's trumpet). */ hang?: boolean }
   | {
       kind: 'cluster';
       florets: number;
