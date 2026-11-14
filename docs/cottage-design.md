@@ -139,8 +139,11 @@ walls.
 
 ## 8. Budgets (the phone comes first)
 
-- **Triangles:** near shape ≤ 32,000; far shape ≤ 5,000 (used beyond 40 m, which is most of the
-  time: tiles become one strip per course with per-tile colours, stones become bumpy walls).
+- **Triangles:** ≤ 32,000, in **one shape used at every distance** (as built: 18,743). An earlier
+  version of this design had a plainer far shape swapped in beyond 40 m; it was dropped after the
+  player's review, because the house visibly changed while pinching and looked different on
+  different screens. Don't bring it back: if the house ever needs to be cheaper far off, make it
+  cheaper everywhere.
 - **Draw calls:** ≤ 6 for the still house (one merged vertex-coloured mesh, glass, snow in
   winter, plus smoke, weather vane, chimes). Today's cottage is 20 draw calls for 3,000 triangles.
 - **Build time:** built once at load (no rebuilds now), ≤ 60 ms on the test machine; nothing
