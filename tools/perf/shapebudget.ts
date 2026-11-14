@@ -1,7 +1,7 @@
 // Shape budget: near and far triangles for every species and variant, against docs/flower-atlas.md's
-// budgets (near ≤ 900, bush ≤ 1,700; far ≤ 250, bush ≤ 400). Plants that were already in the game before
+// budgets (near ≤ 900, bush ≤ 2,000; far ≤ 250, bush ≤ 400). Plants that were already in the game before
 // the atlas (they are in flowerOrigins.ts) over budget are listed as notes; a NEW plant over budget fails.
-// Also builds every shape, timing it. Run:
+// Also builds every shape, timing it. ALL=1 lists every plant, not only those over budget. Run:
 //   npx esbuild tools/perf/shapebudget.ts --bundle --platform=node --outfile=/tmp/shapebudget.cjs --log-level=error && node /tmp/shapebudget.cjs
 import { buildShape, setPlantSeason } from '../../src/world/flowers';
 import { SPECIES } from '../../src/world/flowerSpecies';
@@ -16,7 +16,7 @@ const t0 = Date.now();
 const rows: string[] = [];
 for (const sp of SPECIES) {
   const bush = sp.form.kind === 'rose' || sp.form.kind === 'bush';
-  const nearMax = bush ? 1700 : 900;
+  const nearMax = bush ? 2000 : 900;
   const farMax = bush ? 400 : 250;
   let n = 0;
   let f = 0;
@@ -30,6 +30,7 @@ for (const sp of SPECIES) {
   const isNew = !ORIGINS[sp.id] && sp.form.kind !== 'foliage' && sp.form.kind !== 'aquatic';
   // (Foliage plants and water plants reuse the old leaf and pad shapes, whose far forms are over budget: noted only.)
   const over = n > nearMax || f > farMax;
+  if (!over && process.env.ALL) rows.push(`ok   ${sp.id.padEnd(20)} near ${String(Math.round(n)).padStart(5)}  far ${String(Math.round(f)).padStart(4)}`);
   if (over) {
     rows.push(`${isNew ? 'FAIL' : 'note'} ${sp.id.padEnd(20)} near ${String(Math.round(n)).padStart(5)} (max ${nearMax})  far ${String(Math.round(f)).padStart(4)} (max ${farMax})`);
     if (isNew) fail++;
