@@ -249,6 +249,13 @@ export function basalLeaves(m: FlowerMesh, H: Helpers, habit: LeafHabit, height:
       }
       break;
     }
+    case 'whorl': {
+      // Three broad leaves in a ring round the stem, just under the flower (trillium).
+      const L = clamp(height * 0.5, 0.06, 0.15);
+      const a0 = rng() * 6;
+      for (let i = 0; i < 3; i++) leaf(m, H, V(0, height * 0.74, 0), rising(a0 + i * 2.094 + (rng() - 0.5) * 0.2, lerp(8, 20, rng())), L * lerp(0.9, 1.1, rng()), L * 0.36, { shape: 'ovate', droop: 0.25, color: tint });
+      break;
+    }
     case 'succulent': {
       // A rosette of thick, pointed, grey-green leaves (aloe).
       const n = far ? 6 : 11;
@@ -373,7 +380,7 @@ function drawBloom(m: FlowerMesh, H: Helpers, b: SmallBloom, p: THREE.Vector3, s
         const d = ballDir(i, cnt, 1.75, 0.5);
         const [u] = square(d);
         const tip = p.clone().addScaledVector(d, s * lerp(0.8, 1.1, rng()));
-        const w = s * (far ? 0.09 : 0.045);
+        const w = s * (far ? 0.12 : 0.07);
         m.tri(p.clone().addScaledVector(u, -w), tip, p.clone().addScaledVector(u, w), { color: H.WHITE, petal: true, hinge: p, axis: UP, close: 0, shade: [0.7, 1.05, 0.7], edge: [0, 1, 0] });
       }
       break;
@@ -466,8 +473,8 @@ function shrub(m: FlowerMesh, H: Helpers, f: Form<'bush'>, height: number, rng: 
     // where the sun gets in on top, shaded underneath), no two bulges alike.
     const low = centre.y - ry;
     const heart = V(centre.x, centre.y - ry * 0.35, centre.z);
-    const billow = (c: THREE.Vector3, rx: number, rh: number, tone: THREE.Color) => {
-      const g = new THREE.IcosahedronGeometry(1, 0);
+    const billow = (c: THREE.Vector3, rx: number, rh: number, tone: THREE.Color, detail = 0) => {
+      const g = new THREE.IcosahedronGeometry(1, detail);
       const pos = g.getAttribute('position');
       const ph = rng() * 6;
       const pts: THREE.Vector3[] = [];
@@ -476,19 +483,20 @@ function shrub(m: FlowerMesh, H: Helpers, f: Form<'bush'>, height: number, rng: 
         const y = pos.getY(i);
         const z = pos.getZ(i);
         const k = 1 + 0.16 * Math.sin(x * 3.1 + ph) * Math.sin(z * 2.7 + ph * 1.7) + 0.1 * Math.sin(y * 4.3 + ph * 0.6);
-        // (Flat underneath, and nearly as broad there as at its middle.)
-        const yy = Math.max(y, -0.5);
-        const wide = y < 0 ? 1.12 : 1;
+        // (Flat underneath, and as broad there as at its middle.)
+        const yy = Math.max(y, -0.55) * (y < 0 ? 1.4 : 1);
+        const r = Math.hypot(x, z);
+        const wide = y < -0.05 && r > 0.05 ? Math.max(1, 0.97 / r) * (y < -0.5 ? 0.93 : 1) : 1;
         pts.push(V(c.x + x * k * rx * wide, Math.max(low + 0.01, c.y + yy * k * rh), c.z + z * k * rx * wide));
       }
-      const sh = (v: THREE.Vector3) => lerp(0.66, 1.12, clamp((v.y - low) / (2 * ry), 0, 1)) * (0.97 + 0.06 * Math.sin(v.x * 60 + v.z * 47 + v.y * 53));
+      const sh = (v: THREE.Vector3) => lerp(0.74, 1.12, clamp((v.y - low) / (2 * ry), 0, 1)) * (0.97 + 0.06 * Math.sin(v.x * 60 + v.z * 47 + v.y * 53));
       for (let i = 0; i < pts.length; i += 3) {
         const [p0, p1, p2] = [pts[i], pts[i + 1], pts[i + 2]];
         const ns = [p0, p1, p2].map((v) => v.clone().sub(heart).normalize()) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
         m.tri(p0, p1, p2, { color: tone, n: ns[0], ns, shade: [sh(p0), sh(p1), sh(p2)] });
       }
     };
-    billow(V(centre.x, centre.y - ry * 0.1, centre.z), R * 0.78, ry * 0.9, leafTone);
+    billow(V(centre.x, centre.y - ry * 0.1, centre.z), R * 0.8, ry * 0.9, leafTone, far ? 0 : 1);
     const billows = far ? 3 : 7;
     for (let i = 0; i < billows; i++) {
       const d = ballDir(i, billows, 2.0, rng() * 6);
@@ -513,7 +521,8 @@ function shrub(m: FlowerMesh, H: Helpers, f: Form<'bush'>, height: number, rng: 
   const draw = () => {
     for (let i = 0; i < n; i++) {
       const d = ballDir(i, n, f.hang ? 1.9 : 1.5, 2.3);
-      if (f.hang) d.y = Math.min(d.y, 0.25) - 0.25 * rng();
+      // (Hanging blooms come out of the bush's shoulders, all the way round.)
+      if (f.hang) d.set(Math.cos(i * GOLD), lerp(0.15, 0.6, rng()), Math.sin(i * GOLD));
       const o = outward(d);
       const p = shell(d.normalize(), bare ? lerp(0.6, 1, rng()) : 1.07);
       const dir = f.hang ? V(o.x * 0.35, -1, o.z * 0.35) : o.add(V((rng() - 0.5) * 0.3, 0.25, (rng() - 0.5) * 0.3));
@@ -598,7 +607,7 @@ function spathe(m: FlowerMesh, H: Helpers, top: THREE.Vector3, f: Form<'spathe'>
     heart.bezierCurveTo(-0.8, 0.95, -0.2, 0.9, 0, 0.45);
     heart.bezierCurveTo(0.2, 0.9, 0.8, 0.95, 0.95, 0.35);
     heart.bezierCurveTo(1.1, -0.3, 0.2, -0.6, 0, -1);
-    const g = new THREE.ShapeGeometry(heart, far ? 2 : 6).scale(s * 0.85, s * 0.95, 1).rotateX(-Math.PI / 2 + 0.55).rotateY(-yaw).translate(top.x, top.y + s * 0.4, top.z);
+    const g = new THREE.ShapeGeometry(heart, far ? 2 : 6).scale(s * 0.85, s * 0.95, 1).rotateX(-Math.PI / 2 + 0.75).rotateY(-yaw).translate(top.x, top.y + s * 0.4, top.z);
     tinted(m, H, g, top);
     twig(m, turn(0, s * 0.42, s * 0.3), turn(s * 0.12, s * 1.25, s * 0.42), s * 0.07, new THREE.Color(f.spadix), 0.5);
     return;
@@ -606,18 +615,24 @@ function spathe(m: FlowerMesh, H: Helpers, top: THREE.Vector3, f: Form<'spathe'>
   // A sheet wrapped round the spadix: open down the front, flaring to a point at the back.
   const hood = f.style === 'hood';
   const I = far ? 5 : 9;
-  const J = far ? 2 : 4;
+  const J = hood ? (far ? 4 : 6) : far ? 2 : 4;
   const A = Math.PI * 0.94;
   const P = (i: number, j: number) => {
     const a = -A + (2 * A * i) / I; // 0 is the back
     const t = j / J;
     const back = Math.max(0, Math.cos(a));
     if (hood) {
-      // A tube, then the back of it arches forward over the mouth.
-      const k = Math.max(0, (t - 0.55) / 0.45);
-      const r = s * 0.24 * (1 - k * 0.25);
-      const y = s * (1.25 * Math.min(t, 0.55) / 0.55 + 0.42 * Math.sin((k * Math.PI) / 2) * back);
-      return turn(Math.sin(a) * r * (1 - k * (1 - back) * 0.6), y, -Math.cos(a) * r + s * 0.62 * k * k * back);
+      // A tube widening to its mouth; then the sheet draws in from the sides and its back arches
+      // forward and over, down to a point, like a cobra's hood.
+      if (t <= 0.5) {
+        const u = t / 0.5;
+        const r = s * lerp(0.1, 0.27, u);
+        return turn(Math.sin(a) * r, s * 1.15 * u, -Math.cos(a) * r);
+      }
+      const k = (t - 0.5) / 0.5;
+      const ae = a * (1 - 0.68 * k) * (k > 0.75 ? (1 - k) / 0.25 : 1);
+      const r = s * 0.27 * (1 + 0.25 * Math.sin(k * Math.PI));
+      return turn(Math.sin(ae) * r, s * (1.15 + 0.5 * Math.sin(k * Math.PI * 0.8)), -Math.cos(ae) * r + s * 0.95 * Math.pow(k, 1.4));
     }
     const r = s * (0.09 + 0.46 * Math.pow(t, 1.7)) + s * 0.3 * t * t * back;
     const y = s * 1.55 * t * (0.66 + 0.5 * Math.pow(back, 1.4));
@@ -635,7 +650,8 @@ function spathe(m: FlowerMesh, H: Helpers, top: THREE.Vector3, f: Form<'spathe'>
   }
   const sp = new THREE.Color(f.spadix);
   twig(m, top.clone(), top.clone().add(V(0, s * (hood ? 1.0 : 1.05), 0)), s * (hood ? 0.035 : 0.06), sp, 0.7);
-  if (hood && !far) twig(m, turn(0, s * 1.66, s * 0.38), turn(0, s * 1.2, s * 1.15), s * 0.02, sp, 0.3);
+  // (And from the hood's tip, a long thread trailing down.)
+  if (hood && !far) twig(m, turn(0, s * 1.44, s * 0.68), turn(0, s * 0.5, s * 1.25), s * 0.018, sp, 0.3);
 }
 
 /** A bird of paradise's crest, or a heliconia's ladder of beaks. */
@@ -691,6 +707,15 @@ function fan(m: FlowerMesh, H: Helpers, height: number, f: Form<'fan'>, rng: () 
     const pt = (t: number) => dd.clone().multiplyScalar(reach * Math.pow(t, 2.4)).add(V(0, h * (t - 0.16 * Math.pow(t, 3)), 0));
     const segs = far ? 3 : 6;
     for (let k = 0; k < segs; k++) twig(m, pt(k / segs), pt((k + 1) / segs), 0.0055 * (1 - (k / segs) * 0.45), H.STEM, 0.92);
+    // (With no clump of leaves at its foot, the stem carries them itself, left and right in turn: a toad lily.)
+    if (!f.leaves && !f.furry) {
+      const side = V(-dd.z, 0, dd.x);
+      const nl = far ? 3 : 6;
+      for (let i = 0; i < nl; i++) {
+        const t = lerp(0.12, 0.6, i / (nl - 1));
+        leaf(m, H, pt(t), side.clone().multiplyScalar(i % 2 ? 1 : -1).addScaledVector(UP, 0.5).addScaledVector(dd, 0.3).normalize(), clamp(h * 0.26, 0.06, 0.14) * lerp(0.85, 1.1, rng()), clamp(h * 0.06, 0.016, 0.03), { shape: 'ovate', droop: 0.4 });
+      }
+    }
     const n = far ? Math.ceil(f.florets * 0.55) : f.florets;
     for (let i = 0; i < n; i++) {
       const t = lerp(0.62, 1, i / Math.max(1, n - 1));
@@ -718,7 +743,7 @@ function spider(m: FlowerMesh, H: Helpers, height: number, f: Form<'spider'>, rn
   const lean = V((rng() - 0.5) * 0.05, 0, (rng() - 0.5) * 0.05);
   // (A flame lily's petals sweep straight up like flames, its stamens spread out flat beneath; it climbs by its leaves.)
   const swept = f.open < 0.7;
-  const top = H.stem(m, height, lean, rng, swept);
+  const top = H.stem(m, height, lean, rng, swept || !!f.nod || f.leaves === undefined);
   const heads = far ? Math.min(f.heads, 3) : f.heads;
   const L = f.length * H.HEAD;
   const w = f.width * H.HEAD;
@@ -730,11 +755,13 @@ function spider(m: FlowerMesh, H: Helpers, height: number, f: Form<'spider'>, rn
       if (f.heads > 1) {
         // Each flower on its own stalk, facing outward round the top of the stem.
         const a = (h / heads) * Math.PI * 2 + rng() * 0.5;
-        outDir = V(Math.cos(a) * 0.85, 0.5, Math.sin(a) * 0.85).normalize();
-        centre = top.clone().addScaledVector(outDir, L * 0.55);
+        // (A turk's-cap lily hangs its flowers face down, petals rolled right back.)
+        outDir = V(Math.cos(a) * 0.85, f.nod ? -0.55 : 0.5, Math.sin(a) * 0.85).normalize();
+        centre = top.clone().addScaledVector(V(outDir.x, f.nod ? 0.15 : outDir.y, outDir.z), L * (f.nod ? 0.8 : 0.55)).add(V(0, f.nod ? -h * L * 0.35 : 0, 0));
         twig(m, top, centre, 0.0035, H.STEM, 0.8);
       }
       m.setTilt(centre, new THREE.Quaternion().setFromUnitVectors(UP, outDir));
+      m.invert = outDir.y < -0.2;
       const n = far ? 4 : f.petals;
       const off = rng() * 6;
       for (let i = 0; i < n; i++) {
@@ -750,6 +777,7 @@ function spider(m: FlowerMesh, H: Helpers, height: number, f: Form<'spider'>, rn
           solid(m, new THREE.TetrahedronGeometry(0.006, 0).translate(tip.x, tip.y, tip.z), stam, centre);
         }
       }
+      m.invert = false;
       m.setTilt(null, null);
     }
   });
@@ -775,6 +803,8 @@ function brush(m: FlowerMesh, H: Helpers, height: number, f: Form<'brush'>, rng:
   const top = H.stem(m, Math.max(0.05, height - (f.style === 'dome' ? 0 : L)), lean, rng, f.style === 'spire' || f.style === 'flame' || f.style === 'plume' || f.style === 'dome');
   const axis = (t: number) => top.clone().add(V(0, t * L, 0));
   const out = (a: number) => V(Math.cos(a), 0, Math.sin(a));
+  // (The woody ones carry stiff narrow leaves up the stem.)
+  if (f.leaves === 'leathery') stemLeaves(m, H, top.y, lean, rng, { count: 10, len: 0.12, half: 0.014, from: 0.12, to: 0.95, rise: 42, shape: 'lance', color: new THREE.Color('#5f8660') });
   switch (f.style) {
     case 'cylinder': {
       // Stamens standing straight out all round the stem, which grows on through to a tuft of new leaves.
@@ -782,22 +812,24 @@ function brush(m: FlowerMesh, H: Helpers, height: number, f: Form<'brush'>, rng:
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) / n;
         const o = out(i * GOLD).multiplyScalar(0.97).addScaledVector(UP, 0.2).normalize();
-        filament(m, H, axis(t), axis(t).addScaledVector(o, R * lerp(0.85, 1.08, rng()) * Math.sin(Math.PI * clamp(t * 0.9 + 0.08, 0, 1)) ** 0.35), R * (far ? 0.16 : 0.07), top);
+        filament(m, H, axis(t), axis(t).addScaledVector(o, R * lerp(0.85, 1.08, rng()) * Math.sin(Math.PI * clamp(t * 0.9 + 0.08, 0, 1)) ** 0.35), R * (far ? 0.2 : 0.11), top);
       }
+      // (Packed so close that the brush is solid at its heart.)
+      tinted(m, H, new THREE.CylinderGeometry(R * 0.42, R * 0.46, L * 0.94, far ? 5 : 7, 1).translate(top.x, top.y + L * 0.5, top.z), top, 0);
       twig(m, top, axis(1.12), R * 0.12, H.STEM, 0.7);
       if (!far) for (let i = 0; i < 4; i++) leaf(m, H, axis(1.08), out(i * 1.7).multiplyScalar(0.6).addScaledVector(UP, 0.8).normalize(), L * 0.3, L * 0.035, { droop: 0.1 });
       break;
     }
     case 'candle': {
       // A solid candle of packed flowers, wiry styles hooking out all over it.
-      tinted(m, H, new THREE.CylinderGeometry(R * 0.5, R * 0.62, L, far ? 5 : 7, 1).translate(top.x, top.y + L / 2, top.z), top, 0);
-      tinted(m, H, new THREE.ConeGeometry(R * 0.5, R * 0.6, far ? 5 : 7).translate(top.x, top.y + L + R * 0.3, top.z), top, 0);
+      tinted(m, H, new THREE.CylinderGeometry(R * 0.5, R * 0.62, L, far ? 5 : 9, 1).translate(top.x, top.y + L / 2, top.z), top, 0);
+      tinted(m, H, new THREE.ConeGeometry(R * 0.5, R * 0.6, far ? 5 : 9).translate(top.x, top.y + L + R * 0.3, top.z), top, 0);
       const n = far ? 30 : 130;
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) / n;
         const o = out(i * GOLD);
         const a = axis(t).addScaledVector(o, R * 0.5);
-        filament(m, H, a, a.clone().addScaledVector(o, R * 0.5).add(V(0, R * 0.22, 0)), R * (far ? 0.14 : 0.06), top);
+        filament(m, H, a, a.clone().addScaledVector(o, R * 0.5).add(V(0, R * 0.22, 0)), R * (far ? 0.16 : 0.09), top);
       }
       break;
     }
@@ -828,7 +860,7 @@ function brush(m: FlowerMesh, H: Helpers, height: number, f: Form<'brush'>, rng:
     }
     case 'plume': {
       // A feathery pyramid: side branches all the way up, shorter toward the tip, each beaded with tiny flowers.
-      const n = far ? 6 : 13;
+      const n = far ? 7 : 16;
       twig(m, top, axis(1), 0.004, H.STEM, 0.4);
       for (let i = 0; i < n; i++) {
         const t = i / n;
@@ -837,10 +869,10 @@ function brush(m: FlowerMesh, H: Helpers, height: number, f: Form<'brush'>, rng:
         const a = axis(t);
         const b = a.clone().addScaledVector(o, len);
         if (!far) twig(m, a, b, 0.0025, H.STEM, 0.5);
-        const beads = far ? 2 : 4;
+        const beads = far ? 2 : 5;
         for (let k = 1; k <= beads; k++) {
           const q = a.clone().lerp(b, k / beads);
-          tinted(m, H, new THREE.TetrahedronGeometry(R * (far ? 0.2 : 0.12) * lerp(0.8, 1.2, rng()), 0).translate(q.x, q.y, q.z), top, k / beads);
+          tinted(m, H, new THREE.TetrahedronGeometry(R * (far ? 0.26 : 0.17) * lerp(0.8, 1.2, rng()), 0).translate(q.x, q.y, q.z), top, k / beads);
         }
       }
       tinted(m, H, new THREE.TetrahedronGeometry(R * 0.14, 0).translate(top.x, top.y + L, top.z), top, 1);
@@ -852,7 +884,7 @@ function brush(m: FlowerMesh, H: Helpers, height: number, f: Form<'brush'>, rng:
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) / n;
         const o = out(i * GOLD).multiplyScalar(0.8).addScaledVector(UP, 0.6).normalize();
-        filament(m, H, axis(t), axis(t).addScaledVector(o, R * lerp(0.8, 1.1, rng()) * (1 - t * 0.6)), R * (far ? 0.2 : 0.085), top);
+        filament(m, H, axis(t), axis(t).addScaledVector(o, R * lerp(0.8, 1.1, rng()) * (1 - t * 0.6)), R * (far ? 0.26 : 0.13), top);
       }
       twig(m, top, axis(1), 0.004, H.STEM, 0.4);
       break;

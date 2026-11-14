@@ -1337,7 +1337,7 @@ export function flowerGeometry(sp: FlowerSpecies, seed: number, plantSeed?: numb
       const n = Math.round(f.petals[0]);
       for (let i = 0; i < n; i++) {
         const az = (i / n) * Math.PI * 2;
-        const horn = new THREE.ConeGeometry(f.width * 0.5, f.length * 1.3, 4).translate(0, -f.length * 0.65, 0).rotateZ(0.5).rotateY(-az);
+        const horn = new THREE.ConeGeometry(f.width * 0.3, f.length * 1.05, 4).translate(0, -f.length * 0.52, 0).rotateZ(0.42).rotateY(-az);
         horn.translate(top.x + Math.cos(az) * f.length * 0.35, top.y - 0.005, top.z + Math.sin(az) * f.length * 0.35);
         m.addGeometry(horn, WHITE, true, top, 0.3);
       }

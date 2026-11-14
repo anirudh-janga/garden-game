@@ -16,7 +16,7 @@ import { EUROPE } from './species/europe';
  * recipe for a procedural flower with its own silhouette; every planted flower varies within it.
  */
 /** How a plant's leaves are drawn (see `exotic.ts`). */
-export type LeafHabit = 'strap' | 'paddle' | 'sword' | 'rosette' | 'feathery' | 'heart' | 'succulent' | 'leathery' | 'none';
+export type LeafHabit = 'strap' | 'paddle' | 'sword' | 'rosette' | 'feathery' | 'heart' | 'succulent' | 'leathery' | 'whorl' | 'none';
 
 /**
  * One bloom of a shrub (see `drawBloom` in `exotic.ts`): a ring of broad petals, a double, a
@@ -148,7 +148,7 @@ export type FlowerForm =
   /** A one-sided row of tubular flowers along the top of an arching stem (freesia, crocosmia, kangaroo paw). */
   | { kind: 'fan'; florets: number; size: number; arch: number; furry?: boolean; leaves?: LeafHabit }
   /** An umbel (or one big bloom) of narrow, curled-back petals with long up-curved stamens (nerine, spider lily, flame lily). */
-  | { kind: 'spider'; heads: number; petals: number; length: number; width: number; open: number; stamens: string; wavy?: boolean; leaves?: LeafHabit }
+  | { kind: 'spider'; heads: number; petals: number; length: number; width: number; open: number; stamens: string; wavy?: boolean; /** The flowers hang face down (a turk's-cap lily). */ nod?: boolean; leaves?: LeafHabit }
   /** A cylinder, candle, dome, comb, plume, spire or flame of stiff filaments or tiny florets (bottlebrush, banksia, grevillea, astilbe, celosia, blazing star, foxtail lily, paintbrush). */
   | { kind: 'brush'; style: 'cylinder' | 'candle' | 'dome' | 'comb' | 'plume' | 'spire' | 'flame'; length: number; radius: number; tip?: string; leaves?: LeafHabit }
   /** An arching spray of orchid blooms: moth (round and flat), cattleya (a frilled lip), star (narrow and pointed), slipper (a pouch). */
