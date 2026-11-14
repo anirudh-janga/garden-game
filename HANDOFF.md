@@ -20,6 +20,8 @@ Two rules came out of the review; keep to them:
 
 - **The cottage has one shape at every distance.** No far form. Anything the player can watch
   while pinching must not swap to something that looks different.
+- **No solid lumps standing in for foliage.** A shrub is stems, leaves and flowers, like the
+  roses. A leaf-coloured mass was tried and the player called it "green blobs".
 - **A plant isn't done until it has been looked at.** Render it with `tools/perf/plantgrid.cjs`
   (near, then `FARFORM=1`), montage with `plantgrid.py`, and compare it with the real plant.
 

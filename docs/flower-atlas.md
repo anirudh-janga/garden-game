@@ -144,9 +144,11 @@ The first build of these shapes was reviewed plant by plant and mostly re-drawn.
   petals; `column` for a hibiscus, `tube` for an angel's trumpet), `bell`, `brush`, `cluster` (a head
   of little flowers; `tall` makes a lilac's cone), `bracts`, `pom`, `star`. Hung blooms are lit from
   outside (`FlowerMesh.invert`).
-- **Shrub** (`bush`): soft overlapping billows of leaf, lit as one mound and flat underneath, leaves
-  standing out of it, blooms set over it facing outward (`hang` hangs them from its shoulders;
-  `leaf: 'bare'` is branches and blossom alone). A shrub is at least a third as wide as it is tall.
+- **Shrub** (`bush`): built like the rose bushes. Woody stems from the ground fork into branches
+  whose tips are spread over a dome; real folded leaves all along the branches and up the stems;
+  a bloom at the end of each branch, then more along them (`hang` hangs them from the tips;
+  `leaf: 'bare'` is branches and blossom alone). **Never a solid body of leaf**: a first version
+  had one and the player called it green blobs.
 - **Umbels and spires with real florets**: `cluster.floret` (`trumpet`, `pouch`, `star` with an
   optional `eye`) and `spike.floret` (`tube`, `bell`, `pea`, `butterfly`, `star`; `whorls`, `taper`).
 - **`spider`** gained `nod` (a turk's-cap lily) and sweeps its petals up when `open` is small (flame lily).

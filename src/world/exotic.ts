@@ -441,97 +441,127 @@ function bloomFacing(m: FlowerMesh, H: Helpers, b: SmallBloom, p: THREE.Vector3,
 // --- Habits --------------------------------------------------------------------------------------
 
 /**
- * A shrub: a few woody stems under a mound of leaves, with blooms set over it facing outward.
- * The mound has a dark heart, so it reads as a solid bush and not a handful of twigs; a bare shrub
- * (quince and cherry in blossom) is its branches and flowers alone.
+ * A leaf of a shrub: folded a little along its midrib, so its two halves catch the light
+ * differently (far off, and for needles, a flat sliver).
+ */
+function shrubLeaf(m: FlowerMesh, base: THREE.Vector3, dir: THREE.Vector3, len: number, half: number, color: THREE.Color, flat: boolean) {
+  const side = V().crossVectors(dir, UP);
+  if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+  side.normalize();
+  const up = V().crossVectors(side, dir).normalize();
+  const tip = base.clone().addScaledVector(dir, len).addScaledVector(UP, -len * 0.18);
+  const mid = base.clone().addScaledVector(dir, len * 0.45).addScaledVector(UP, -len * 0.04);
+  if (flat) {
+    m.tri(base, mid.clone().addScaledVector(side, -half), tip, { color, shade: [0.8, 1, 1.08] });
+    m.tri(base, tip, mid.clone().addScaledVector(side, half), { color, shade: [0.8, 1.08, 1] });
+    return;
+  }
+  const l = mid.clone().addScaledVector(side, -half).addScaledVector(up, half * 0.45);
+  const r = mid.clone().addScaledVector(side, half).addScaledVector(up, half * 0.45);
+  m.tri(base, l, mid, { color, shade: [0.78, 1.04, 0.9] });
+  m.tri(l, tip, mid, { color, shade: [1.04, 1.1, 0.9] });
+  m.tri(base, mid, r, { color, shade: [0.78, 0.9, 1.04] });
+  m.tri(mid, tip, r, { color, shade: [0.9, 1.1, 1.04] });
+}
+
+/**
+ * A shrub, built the way the rose bushes are: woody stems from the ground that fork into
+ * branches, real leaves all along them, and a bloom at the end of each branch (more along the
+ * branches when it is covered in flower). The branch tips are spread over a dome, so the bush has
+ * a rounded outline you can see into, not a solid mass. A bare shrub (quince and cherry in
+ * blossom) is its branches and flowers alone.
  */
 function shrub(m: FlowerMesh, H: Helpers, f: Form<'bush'>, height: number, rng: () => number): number {
   const far = H.isFar();
-  // (A shrub is about as wide as it is tall.)
-  const R = Math.max(f.radius, height * (f.leaf === 'bare' ? 0.3 : 0.36));
-  const bare0 = f.leaf === 'bare';
-  const cy = height * (bare0 ? 0.6 : 0.52);
-  const ry = height * (bare0 ? 0.4 : 0.48);
-  const centre = V(0, cy, 0);
-  const wood = new THREE.Color('#6a553c');
   const bare = f.leaf === 'bare';
+  // (A shrub is about two-thirds as wide as it is tall, or wider.)
+  const R = Math.max(f.radius, height * (bare ? 0.3 : 0.34));
+  const sc = clamp(height / 0.9, 0.35, 1.1);
+  const cy = height * 0.4;
+  const ry = height * 0.6;
+  const wood = new THREE.Color('#6a553c');
   // (Its own green, brought a little toward the garden's, so a shrub sits among the other plants.)
-  const leafTone = (f.leafColor ? new THREE.Color(f.leafColor) : f.leaf === 'grey' ? new THREE.Color('#7f957a') : new THREE.Color('#3f7a3a')).lerp(H.LEAF, 0.3);
-  const shell = (d: THREE.Vector3, k = 1) => V(centre.x + d.x * R * k, centre.y + d.y * ry * k, centre.z + d.z * R * k);
-  const outward = (d: THREE.Vector3) => V(d.x / R, d.y / ry, d.z / R).normalize();
-  // Woody stems from the ground up into the mound (right out to the flowers on a bare shrub).
-  const stems = far ? 3 : bare ? 8 : 4;
-  for (let i = 0; i < stems; i++) {
-    const d = ballDir(i, stems, 1.35, 0.7);
-    const end = shell(d, bare ? 0.95 : 0.55);
-    const knee = V(end.x * 0.35, end.y * 0.5, end.z * 0.35);
-    twig(m, V(end.x * 0.06, 0, end.z * 0.06), knee, 0.009, wood, 0.8);
-    twig(m, knee, end, 0.007, wood, 0.5);
+  const leafTone = (f.leafColor ? new THREE.Color(f.leafColor) : f.leaf === 'grey' ? new THREE.Color('#7f957a') : new THREE.Color('#3f7a3a')).lerp(H.LEAF, 0.35);
+  const dome = (d: THREE.Vector3, k = 1) => V(d.x * R * k, cy + d.y * ry * k, d.z * R * k);
+  const outward = (p: THREE.Vector3) => V(p.x / R, (p.y - cy) / ry, p.z / R).normalize();
+
+  // The main stems, from the ground to where they fork.
+  const nStems = far ? 3 : height < 0.45 ? 4 : 5;
+  const ph = rng() * 6;
+  const knees: THREE.Vector3[] = [];
+  for (let j = 0; j < nStems; j++) {
+    const knee = dome(ballDir(j, nStems, 1.15, ph), lerp(0.32, 0.42, rng()));
+    const base = V(knee.x * 0.14, 0, knee.z * 0.14);
+    const mid = base.clone().lerp(knee, 0.5).add(V(knee.x * 0.12, 0, knee.z * 0.12));
+    twig(m, base, mid, 0.0085 * sc, wood, 0.85);
+    twig(m, mid, knee, 0.0072 * sc, wood, 0.75);
+    knees.push(knee);
   }
+
+  // The branches, each from the nearest fork out to a tip on the dome.
+  const nTips = far ? 10 : bare ? 14 : 16;
+  const tips: { from: THREE.Vector3; mid: THREE.Vector3; tip: THREE.Vector3 }[] = [];
+  for (let i = 0; i < nTips; i++) {
+    const tip = dome(ballDir(i, nTips, bare ? 1.6 : 1.9, ph + 1.3), lerp(0.9, 1.04, rng()));
+    let from = knees[0];
+    for (const k of knees) if (k.distanceToSquared(tip) < from.distanceToSquared(tip)) from = k;
+    // (Bowed upward a little, as a branch reaching for light is.)
+    const mid = from.clone().lerp(tip, 0.5).add(V(0, from.distanceTo(tip) * 0.1, 0));
+    if (bare) {
+      twig(m, from, mid, 0.0052 * sc, wood, 0.8);
+      twig(m, mid, tip, 0.0042 * sc, wood, 0.55);
+    } else twig(m, from, tip, 0.005 * sc, wood, 0.5);
+    tips.push({ from, mid, tip });
+  }
+  const along = (b: { from: THREE.Vector3; mid: THREE.Vector3; tip: THREE.Vector3 }, t: number) => (!bare ? b.from.clone().lerp(b.tip, t) : t < 0.5 ? b.from.clone().lerp(b.mid, t * 2) : b.mid.clone().lerp(b.tip, t * 2 - 1));
+
   if (!bare) {
-    // The body of the bush: soft overlapping billows of leaf, lit as one rounded mound (lighter
-    // where the sun gets in on top, shaded underneath), no two bulges alike.
-    const low = centre.y - ry;
-    const heart = V(centre.x, centre.y - ry * 0.35, centre.z);
-    const billow = (c: THREE.Vector3, rx: number, rh: number, tone: THREE.Color, detail = 0) => {
-      const g = new THREE.IcosahedronGeometry(1, detail);
-      const pos = g.getAttribute('position');
-      const ph = rng() * 6;
-      const pts: THREE.Vector3[] = [];
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i);
-        const y = pos.getY(i);
-        const z = pos.getZ(i);
-        const k = 1 + 0.16 * Math.sin(x * 3.1 + ph) * Math.sin(z * 2.7 + ph * 1.7) + 0.1 * Math.sin(y * 4.3 + ph * 0.6);
-        // (Flat underneath, and as broad there as at its middle.)
-        const yy = Math.max(y, -0.55) * (y < 0 ? 1.4 : 1);
-        const r = Math.hypot(x, z);
-        const wide = y < -0.05 && r > 0.05 ? Math.max(1, 0.97 / r) * (y < -0.5 ? 0.93 : 1) : 1;
-        pts.push(V(c.x + x * k * rx * wide, Math.max(low + 0.01, c.y + yy * k * rh), c.z + z * k * rx * wide));
-      }
-      const sh = (v: THREE.Vector3) => lerp(0.74, 1.12, clamp((v.y - low) / (2 * ry), 0, 1)) * (0.97 + 0.06 * Math.sin(v.x * 60 + v.z * 47 + v.y * 53));
-      for (let i = 0; i < pts.length; i += 3) {
-        const [p0, p1, p2] = [pts[i], pts[i + 1], pts[i + 2]];
-        const ns = [p0, p1, p2].map((v) => v.clone().sub(heart).normalize()) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
-        m.tri(p0, p1, p2, { color: tone, n: ns[0], ns, shade: [sh(p0), sh(p1), sh(p2)] });
-      }
+    // Leaves all along every branch, turned outward and up, no two the same size or green.
+    const [len0, half0] = f.leaf === 'long' ? [0.17, 0.024] : f.leaf === 'small' || f.leaf === 'grey' ? [0.1, 0.032] : f.leaf === 'needle' ? [0.1, 0.008] : [0.125, 0.04];
+    const k = (far ? 1.7 : 1) * clamp(height / 0.9, 0.5, 1.1);
+    const per = far ? 3 : f.leaf === 'needle' ? 8 : f.leaf === 'glossy' ? 5 : 6;
+    const flat = far || f.leaf === 'needle';
+    const one = (p: THREE.Vector3, bdir: THREE.Vector3) => {
+      const o = outward(p);
+      const dir = o.multiplyScalar(0.7).addScaledVector(bdir, 0.45).add(V((rng() - 0.5) * 1.1, 0.25 + rng() * 0.35, (rng() - 0.5) * 1.1)).normalize();
+      // (Lower and inner leaves sit in the bush's own shade.)
+      const tone = leafTone.clone().multiplyScalar(lerp(0.8, 1.22, clamp(p.y / height, 0, 1)) * lerp(0.9, 1.12, rng()));
+      shrubLeaf(m, p, dir, len0 * k * lerp(0.8, 1.2, rng()), half0 * k * lerp(0.85, 1.15, rng()), tone, flat);
     };
-    billow(V(centre.x, centre.y - ry * 0.1, centre.z), R * 0.8, ry * 0.9, leafTone, far ? 0 : 1);
-    const billows = far ? 3 : 7;
-    for (let i = 0; i < billows; i++) {
-      const d = ballDir(i, billows, 2.0, rng() * 6);
-      billow(shell(d, 0.52), R * lerp(0.42, 0.56, rng()), ry * lerp(0.4, 0.52, rng()), leafTone.clone().multiplyScalar(lerp(0.9, 1.12, rng())));
+    for (const b of tips) {
+      const bdir = b.tip.clone().sub(b.from).normalize();
+      for (let i = 0; i < per; i++) one(along(b, lerp(0.18, 1, (i + rng() * 0.6) / per)), bdir);
     }
-    // Leaves standing out of it all over, lying outward and upward like shingles, in tones a little apart.
-    const sc = clamp(R / 0.26, 0.5, 1.1);
-    const [len0, half0] = f.leaf === 'long' ? [0.17, 0.026] : f.leaf === 'small' || f.leaf === 'grey' ? [0.085, 0.026] : f.leaf === 'needle' ? [0.09, 0.009] : [0.12, 0.038];
-    const len = len0 * sc;
-    const half = half0 * sc;
-    const n = far ? 12 : f.leaf === 'needle' ? 64 : 46;
-    for (let i = 0; i < n; i++) {
-      const d = ballDir(i, n, 2.0, 0.2);
-      const o = outward(d);
-      const dir = o.clone().multiplyScalar(0.6).add(V((rng() - 0.5) * 0.9, 0.7, (rng() - 0.5) * 0.9)).normalize();
-      leaf(m, H, shell(d, lerp(0.84, 0.98, rng())), dir, len * lerp(0.8, 1.2, rng()) * (far ? 1.7 : 1), half * (far ? 1.9 : 1), { shape: f.leaf === 'long' || f.leaf === 'needle' ? 'lance' : 'ovate', droop: 0.35, color: leafTone.clone().multiplyScalar(lerp(1.0, 1.38, rng())), dark: 0.85 });
-    }
+    // (And up the main stems, so the bush is clothed nearly to the ground.)
+    if (!far) for (const knee of knees) for (let i = 0; i < 4; i++) one(V(knee.x, knee.y, knee.z).multiplyScalar(lerp(0.4, 1, i / 3)), UP);
   }
-  // The blooms, over the top and shoulders (or hanging under its edge).
+
+  // The blooms: one at the end of each branch, then more along the branches.
   const s = f.bloom.size * H.HEAD;
   const n = far ? Math.ceil(f.blooms * 0.55) : f.blooms;
   const draw = () => {
     for (let i = 0; i < n; i++) {
-      const d = ballDir(i, n, f.hang ? 1.9 : 1.5, 2.3);
-      // (Hanging blooms come out of the bush's shoulders, all the way round.)
-      if (f.hang) d.set(Math.cos(i * GOLD), lerp(0.15, 0.6, rng()), Math.sin(i * GOLD));
-      const o = outward(d);
-      const p = shell(d.normalize(), bare ? lerp(0.6, 1, rng()) : 1.07);
-      const dir = f.hang ? V(o.x * 0.35, -1, o.z * 0.35) : o.add(V((rng() - 0.5) * 0.3, 0.25, (rng() - 0.5) * 0.3));
+      const b = tips[Math.floor(((i % nTips) + 0.5) * (nTips / Math.min(n, nTips))) % nTips];
+      const round = Math.floor(i / nTips);
+      // (On a bare shrub the blossom runs all along the wood.)
+      const t = round === 0 && !bare ? 1 : lerp(0.45, 0.9, rng());
+      const p = along(b, t);
+      const o = outward(p);
+      if (t < 1) p.addScaledVector(o, s * 0.5);
+      if (f.hang) {
+        // (Hanging from the branch end on a short stalk, mouth down and a little outward.)
+        const q = p.clone().add(V(o.x * s * 0.3, -s * 0.35, o.z * s * 0.3));
+        twig(m, p, q, 0.003 * sc, H.STEM, 0.8);
+        bloomFacing(m, H, f.bloom, q, V(o.x * 0.3, -1, o.z * 0.3), s * lerp(0.9, 1.1, rng()) * (far ? 1.25 : 1), rng);
+        continue;
+      }
+      const dir = o.add(V((rng() - 0.5) * 0.3, 0.45, (rng() - 0.5) * 0.3));
       bloomFacing(m, H, f.bloom, p, dir, s * lerp(0.88, 1.1, rng()) * (far ? 1.25 : 1), rng);
     }
   };
   if (f.bloom.type === 'trumpet' && f.blooms <= 10) draw();
   else H.light(draw);
-  return cy + ry;
+  return height;
 }
 
 /** A protea, waratah, poinsettia, edelweiss…: stiff pointed bracts in rows round a centre, on a stout leafy stem. */
